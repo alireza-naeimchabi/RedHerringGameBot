@@ -55,8 +55,9 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "/start" -> sendText(chatId, "Welcome to Red Herring! 🕵️ Add me to a group and send /newgame.");
             case "/newgame" -> handleNewGame(message);
             case "/join" -> handleJoin(message);
-            case "/startgame" -> handleStartGame(message, false);
-            case "/testmurderer" -> handleStartGame(message, true);
+            case "/startgame" -> handleStartGame(message, null);
+            case "/testmurderer" -> handleStartGame(message, Role.MURDERER);
+            case "/testscientist" -> handleStartGame(message, Role.FORENSIC_SCIENTIST);
             case "/addtestplayers" -> handleAddTestPlayers(message);
             default -> { }
         }
@@ -121,7 +122,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         }
     }
 
-    private void handleStartGame(Message message, boolean senderIsMurderer)
+    private void handleStartGame(Message message, Role forcedRole)
     {
         long chatId = message.getChatId();
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(chatId);
@@ -139,10 +140,10 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             return;
         }
 
-        Player forcedMurderer = senderIsMurderer
+        Player forcedPlayer = (forcedRole != null)
                 ? new Player(message.getFrom().getId(), message.getFrom().getFirstName())
                 : null;
-        Game game = gameService.startGame(chatId, lobby.getPlayers(), forcedMurderer);
+        Game game = gameService.startGame(chatId, lobby.getPlayers(), forcedPlayer, forcedRole);
         lobbyService.removeLobby(chatId);
 
         game.getRoles().forEach((player, role) ->
@@ -211,28 +212,51 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         String[] parts = callback.getData().split(":");
         String type = parts[0];
         long groupChatId = Long.parseLong(parts[1]);
-        int index = Integer.parseInt(parts[2]);
         long userId = callback.getFrom().getId();
 
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
         if (gameOpt.isEmpty()) {
             return;
         }
-
         Game game = gameOpt.get();
-        if (game.getMurderer().userId() != userId) {
+
+        switch (type) {
+            case "W" -> handleWeaponChoice(game, groupChatId, userId, Integer.parseInt(parts[2]));
+            case "E" -> handleEvidenceChoice(game, groupChatId, userId, Integer.parseInt(parts[2]));
+            case "H" -> handleHintChoice(game, groupChatId, userId,
+                    Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+            default -> { }
+        }
+    }
+
+    private void handleWeaponChoice(Game game, long groupChatId, long userId, int index) {
+        if (game.getMurderer().userId() != userId || game.hasWeapon()) {
             return;
         }
+        game.chooseWeapon(index);
+        sendKeyboard(userId, "🔍 Choose the evidence you left behind:",
+                CardKeyboardFactory.createCardKeyboard(
+                        game.getMurdererHand().evidence(), "E:" + groupChatId + ":"));
+    }
 
-        if (type.equals("W") && !game.hasWeapon()) {
-            game.chooseWeapon(index);
-            sendKeyboard(userId, "🔍 Choose the evidence you left behind:",
-                    CardKeyboardFactory.createCardKeyboard(
-                            game.getMurdererHand().evidence(), "E:" + groupChatId + ":"));
-        } else if (type.equals("E") && game.hasWeapon() && !game.hasSolution()) {
-            game.chooseEvidence(index);
-            announceSolutionChosen(groupChatId, game);
+    private void handleEvidenceChoice(Game game, long groupChatId, long userId, int index)
+    {
+        if (game.getMurderer().userId() != userId || !game.hasWeapon() || game.hasSolution()) {
+            return;
         }
+        game.chooseEvidence(index);
+        announceSolutionChosen(groupChatId, game);
+    }
+
+    private void handleHintChoice(Game game, long groupChatId, long userId, int tileIndex, int optionIndex) {
+        if (game.getForensicScientist().userId() != userId) {
+            return;
+        }
+        if (!game.hasSolution() || tileIndex != game.getCurrentHintIndex()) {
+            return;
+        }
+        game.addHint(optionIndex);
+        askForNextHint(groupChatId, game);
     }
 
     private void announceSolutionChosen(long groupChatId, Game game) {
@@ -242,6 +266,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         sendText(game.getForensicScientist().userId(),
                 "The murderer is " + game.getMurderer().name() + ".\nSolution: " + solution);
         sendText(groupChatId, "🔪 The murderer has made a choice. The investigation begins!");
+        askForNextHint(groupChatId, game);
+
     }
 
     private void sendKeyboard(long chatId, String text, InlineKeyboardMarkup keyboard) {
@@ -265,6 +291,38 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    private void askForNextHint(long groupChatId, Game game) {
+        Optional<HintTile> tileOpt = game.getCurrentHintTile();
+
+        if (tileOpt.isEmpty()) {
+            sendText(groupChatId, buildHintOverview(game));
+            return;
+        }
+
+        HintTile tile = tileOpt.get();
+        Player scientist = game.getForensicScientist();
+
+        if (scientist.userId() < 0) {
+            game.addHint(new Random().nextInt(tile.options().size()));
+            askForNextHint(groupChatId, game);
+            return;
+        }
+
+        String prefix = "H:" + groupChatId + ":" + game.getCurrentHintIndex() + ":";
+        sendKeyboard(scientist.userId(), "🧪 " + tile.title() + " – choose one hint:",
+                CardKeyboardFactory.createTextKeyboard(tile.options(), prefix));
+    }
+
+    private String buildHintOverview(Game game) {
+        StringBuilder text = new StringBuilder("🧪 Hints from the Forensic Scientist\n\n");
+
+        game.getHints().forEach(hint ->
+                text.append("• ").append(hint.title()).append(": ").append(hint.choice()).append("\n"));
+
+        text.append("\nDiscuss! Who is the murderer?");
+        return text.toString();
     }
 
 }

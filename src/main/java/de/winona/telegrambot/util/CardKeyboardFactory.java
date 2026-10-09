@@ -14,11 +14,16 @@ public class CardKeyboardFactory {
     }
 
     public static InlineKeyboardMarkup createCardKeyboard(List<Card> cards, String callbackPrefix) {
+        List<String> names = cards.stream().map(Card::name).toList();
+        return createTextKeyboard(names, callbackPrefix);
+    }
+
+    public static InlineKeyboardMarkup createTextKeyboard(List<String> texts, String callbackPrefix) {
         List<InlineKeyboardRow> rows = new ArrayList<>();
 
-        for (int i = 0; i < cards.size(); i++) {
+        for (int i = 0; i < texts.size(); i++) {
             InlineKeyboardButton button = InlineKeyboardButton.builder()
-                    .text(cards.get(i).name())
+                    .text(texts.get(i))
                     .callbackData(callbackPrefix + i)
                     .build();
             rows.add(new InlineKeyboardRow(button));

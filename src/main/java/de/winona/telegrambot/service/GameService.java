@@ -2,6 +2,7 @@ package de.winona.telegrambot.service;
 
 import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Player;
+import de.winona.telegrambot.model.Role;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,8 +14,8 @@ public class GameService
 
     private final Map<Long, Game> games = new HashMap<>();
 
-    public Game startGame(long chatId, List<Player> players, Player forcedMurderer) {
-        Game game = new Game(players, forcedMurderer);
+    public Game startGame(long chatId, List<Player> players, Player forcedPlayer, Role forcedRole) {
+        Game game = new Game(players, forcedPlayer, forcedRole);
         games.put(chatId, game);
         return game;
     }

@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class Game
 {
@@ -15,14 +16,16 @@ public class Game
     private Card murderWeapon;
     private Card keyEvidence;
 
-    public Game(List<Player> players, Player forcedMurderer)
-    {
+    private final List<HintTile> hintTiles = HintDeck.drawTiles();
+    private final List<Hint> hints = new ArrayList<>();
+
+    public Game(List<Player> players, Player forcedPlayer, Role forcedRole) {
         List<Player> shuffled = new ArrayList<>(players);
         Collections.shuffle(shuffled);
 
-        if (forcedMurderer != null && shuffled.remove(forcedMurderer))
-        {
-            shuffled.add(1, forcedMurderer);
+        if (forcedPlayer != null && shuffled.remove(forcedPlayer)) {
+            int index = (forcedRole == Role.FORENSIC_SCIENTIST) ? 0 : 1;
+            shuffled.add(index, forcedPlayer);
         }
 
         for (int i = 0; i < shuffled.size(); i++)
@@ -98,5 +101,31 @@ public class Game
 
     public Card getKeyEvidence() {
         return keyEvidence;
+    }
+
+
+
+    public Optional<HintTile> getCurrentHintTile() {
+        if (allHintsGiven()) {
+            return Optional.empty();
+        }
+        return Optional.of(hintTiles.get(hints.size()));
+    }
+
+    public int getCurrentHintIndex() {
+        return hints.size();
+    }
+
+    public void addHint(int optionIndex) {
+        HintTile tile = hintTiles.get(hints.size());
+        hints.add(new Hint(tile.title(), tile.options().get(optionIndex)));
+    }
+
+    public boolean allHintsGiven() {
+        return hints.size() >= hintTiles.size();
+    }
+
+    public List<Hint> getHints() {
+        return Collections.unmodifiableList(hints);
     }
 }
