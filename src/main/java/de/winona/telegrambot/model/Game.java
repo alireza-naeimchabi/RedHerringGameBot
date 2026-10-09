@@ -11,8 +11,10 @@ public class Game
     private Card murderWeapon;
     private Card keyEvidence;
 
-    private final List<HintTile> hintTiles = HintDeck.drawTiles();
+    private final HintDeck hintDeck = new HintDeck();
+    private final List<HintTile> hintTiles = hintDeck.drawStartTiles();
     private final List<Hint> hints = new ArrayList<>();
+
 
     private final Set<Long> usedAccusations = new HashSet<>();
 
