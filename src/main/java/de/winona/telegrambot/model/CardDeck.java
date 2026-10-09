@@ -8,17 +8,20 @@ import java.util.List;
 
 public class CardDeck {
 
-    public static final int CARDS_PER_TYPE = 3;
+    public static final int CARDS_PER_TYPE = 4;
 
     private static final List<String> WEAPON_NAMES = List.of(
             "Knife", "Poison", "Rope", "Hammer", "Pistol", "Scissors",
             "Pillow", "Axe", "Wrench", "Sleeping Pills", "Broken Bottle", "Electric Cable",
-            "Brick", "Screwdriver", "Crossbow", "Frying Pan", "Ice Pick", "Scarf");
+            "Brick", "Screwdriver", "Crossbow", "Frying Pan", "Ice Pick", "Scarf",
+            "Baseball Bat", "Dumbbell", "Razor Blade", "Golf Club", "Plastic Bag", "Shovel");
+
 
     private static final List<String> EVIDENCE_NAMES = List.of(
             "Lipstick", "Train Ticket", "Glove", "Key", "Receipt", "Cigarette",
             "Button", "Phone", "Coffee Cup", "Perfume", "Muddy Shoe", "Letter",
-            "Photo", "Coin", "Watch", "Hair", "Umbrella", "Napkin");
+            "Photo", "Coin", "Watch", "Hair", "Umbrella",
+            "Napkin", "Earring", "Bus Ticket", "Lighter", "Notebook", "Sunglasses", "Chewing Gum");
 
     private final Deque<Card> weapons;
     private final Deque<Card> evidence;

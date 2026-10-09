@@ -155,6 +155,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
                 sendText(player.userId(), "Your role: " + role.getTitle() + "\n" + role.getDescription()));
 
         sendText(chatId, "The game has started! I sent everyone a secret role in private chat. 🤫");
+        sendText(chatId, "🧪 The Forensic Scientist is " + game.getForensicScientist().name()
+                + ". They know the solution, but they cannot talk about it.");
         sendText(chatId, buildCardOverview(game));
         startMurdererChoice(chatId, game);
     }

@@ -145,7 +145,7 @@ public class Game
         Optional<Player> player = getPlayer(userId);
         return player.isPresent()
                 && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
-                && allHintsGiven()
+                && hasSolution()
                 && !usedAccusations.contains(userId);
     }
 
