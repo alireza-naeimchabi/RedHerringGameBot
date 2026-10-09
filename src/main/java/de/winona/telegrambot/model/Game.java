@@ -16,6 +16,13 @@ public class Game
     private final List<Hint> hints = new ArrayList<>();
 
 
+    public static final int MAX_ROUNDS = 3;
+    public static final int FIXED_TILES = 2; // Cause of death + Location bleiben immer
+
+    private int round = 1;
+    private HintTile pendingTile;
+    private Integer pendingSlot;
+
     private final Set<Long> usedAccusations = new HashSet<>();
 
     public Game(List<Player> players, Player forcedPlayer, Role forcedRole) {
@@ -164,5 +171,43 @@ public class Game
                 .map(Map.Entry::getKey)
                 .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
                 .allMatch(player -> usedAccusations.contains(player.userId()));
+    }
+
+    public int getRound() {
+        return round;
+    }
+
+    public boolean isLastRound() {
+        return round >= MAX_ROUNDS;
+    }
+
+    public HintTile startNextRound() {
+        round++;
+        pendingTile = hintDeck.drawTile();
+        pendingSlot = null;
+        return pendingTile;
+    }
+
+    public boolean isReplacementPending() {
+        return pendingTile != null;
+    }
+
+    public HintTile getPendingTile() {
+        return pendingTile;
+    }
+
+    public boolean hasPendingSlot() {
+        return pendingSlot != null;
+    }
+
+    public void chooseSlotToReplace(int slot) {
+        pendingSlot = slot;
+    }
+
+    public void addReplacementHint(int optionIndex) {
+        hintTiles.set(pendingSlot, pendingTile);
+        hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex)));
+        pendingTile = null;
+        pendingSlot = null;
     }
 }

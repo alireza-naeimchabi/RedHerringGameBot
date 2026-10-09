@@ -50,6 +50,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         String command = message.getText().split(" ")[0].split("@")[0];
 
         switch (command) {
+            case "/nextround" -> handleNextRound(message);
             case "/start" -> sendText(chatId, "Welcome to Red Herring! 🕵️ Add me to a group and send /newgame.");
             case "/newgame" -> handleNewGame(message);
             case "/join" -> handleJoin(message);
@@ -236,6 +237,10 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "AP" -> handleAccuseSuspect(game, groupChatId, userId, parts);
             case "AW" -> handleAccuseWeapon(game, groupChatId, userId, parts);
             case "AE" -> handleAccuseEvidence(game, groupChatId, userId, parts);
+            case "R" -> handleReplaceSlot(game, groupChatId, userId,
+                    Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+            case "N" -> handleReplacementHint(game, groupChatId, userId,
+                    Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
             default -> { }
         }
     }
@@ -328,12 +333,16 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     }
 
     private String buildHintOverview(Game game) {
-        StringBuilder text = new StringBuilder("🧪 Hints from the Forensic Scientist\n\n");
+        StringBuilder text = new StringBuilder("🧪 Hints – Round " + game.getRound()
+                + " of " + Game.MAX_ROUNDS + "\n\n");
 
         game.getHints().forEach(hint ->
                 text.append("• ").append(hint.title()).append(": ").append(hint.choice()).append("\n"));
 
-        text.append("\nDiscuss! Who is the murderer?");
+        text.append("\nDiscuss! Use /accuse to solve the crime.\n");
+        text.append(game.isLastRound()
+                ? "Forensic Scientist: send /nextround to close the case."
+                : "Forensic Scientist: send /nextround for a new hint.");
         return text.toString();
     }
 
@@ -439,5 +448,85 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     private String buildSolutionText(Game game) {
         return "The murderer was " + game.getMurderer().name() + " with "
                 + game.getMurderWeapon().name() + " + " + game.getKeyEvidence().name() + ".";
+    }
+
+    private void handleNextRound(Message message) {
+        long chatId = message.getChatId();
+        long userId = message.getFrom().getId();
+
+        Optional<Game> gameOpt = gameService.getGame(chatId);
+        if (gameOpt.isEmpty()) {
+            sendText(chatId, "There is no running game.");
+            return;
+        }
+
+        Game game = gameOpt.get();
+        Player scientist = game.getForensicScientist();
+
+        if (scientist.userId() > 0 && scientist.userId() != userId) {
+            sendText(chatId, "Only the Forensic Scientist can start the next round.");
+            return;
+        }
+        if (!game.allHintsGiven() || game.isReplacementPending()) {
+            sendText(chatId, "The current round is not finished yet.");
+            return;
+        }
+        if (game.isLastRound()) {
+            sendText(chatId, "⌛ The final round is over and nobody solved the crime. "
+                    + "The murderer wins! 🔪\n" + buildSolutionText(game));
+            gameService.endGame(chatId);
+            return;
+        }
+
+        HintTile newTile = game.startNextRound();
+        sendText(chatId, "🔔 Round " + game.getRound()
+                + " begins. The Forensic Scientist replaces one hint.");
+
+        if (scientist.userId() < 0) {
+            Random random = new Random();
+            int replaceable = game.getHints().size() - Game.FIXED_TILES;
+            game.chooseSlotToReplace(Game.FIXED_TILES + random.nextInt(replaceable));
+            game.addReplacementHint(random.nextInt(newTile.options().size()));
+            sendText(chatId, buildHintOverview(game));
+            return;
+        }
+
+        Map<String, String> buttons = new LinkedHashMap<>();
+        List<Hint> hints = game.getHints();
+        for (int i = Game.FIXED_TILES; i < hints.size(); i++) {
+            buttons.put(hints.get(i).title() + ": " + hints.get(i).choice(),
+                    "R:" + chatId + ":" + game.getRound() + ":" + i);
+        }
+
+        sendKeyboard(scientist.userId(), "🔔 Round " + game.getRound() + ". New tile: "
+                        + newTile.title() + "\nWhich old hint do you replace?",
+                CardKeyboardFactory.createKeyboard(buttons));
+    }
+
+    private void handleReplaceSlot(Game game, long groupChatId, long userId, int round, int slot) {
+        if (game.getForensicScientist().userId() != userId) {
+            return;
+        }
+        if (round != game.getRound() || !game.isReplacementPending() || game.hasPendingSlot()) {
+            return;
+        }
+
+        game.chooseSlotToReplace(slot);
+        HintTile tile = game.getPendingTile();
+        sendKeyboard(userId, "🧪 " + tile.title() + " – choose one hint:",
+                CardKeyboardFactory.createTextKeyboard(tile.options(),
+                        "N:" + groupChatId + ":" + round + ":"));
+    }
+
+    private void handleReplacementHint(Game game, long groupChatId, long userId, int round, int optionIndex) {
+        if (game.getForensicScientist().userId() != userId) {
+            return;
+        }
+        if (round != game.getRound() || !game.hasPendingSlot()) {
+            return;
+        }
+
+        game.addReplacementHint(optionIndex);
+        sendText(groupChatId, buildHintOverview(game));
     }
 }
