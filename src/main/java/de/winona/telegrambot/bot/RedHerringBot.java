@@ -1,7 +1,9 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Lobby;
 import de.winona.telegrambot.model.Player;
+import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
@@ -13,10 +15,12 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.util.Optional;
 
-public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
+public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
+{
 
     private final LobbyService lobbyService = new LobbyService();
     private final TelegramClient telegramClient;
+    private final GameService gameService = new GameService();
 
     public RedHerringBot(String botToken) {
         this.telegramClient = new OkHttpTelegramClient(botToken);
@@ -36,6 +40,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
             case "/start" -> sendText(chatId, "Welcome to Red Herring! 🕵️ Add me to a group and send /newgame.");
             case "/newgame" -> handleNewGame(message);
             case "/join" -> handleJoin(message);
+            case "/startgame" -> handleStartGame(message);
             default -> { }
         }
     }
@@ -65,25 +70,61 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
         }
 
         Lobby lobby = lobbyOpt.get();
-        Player player = new Player(message.getFrom().getId(), message.getFrom().getFirstName());
+        long userId = message.getFrom().getId();
+        String name = message.getFrom().getFirstName();
 
-        if (lobby.addPlayer(player)) {
-            sendText(chatId, player.name() + " joined. Players: "
-                    + lobby.getPlayers().size() + "/" + Lobby.MAX_PLAYERS);
-        } else {
-            sendText(chatId, player.name() + ", you are already in the game or the lobby is full.");
+        if (lobby.hasPlayer(userId)) {
+            sendText(chatId, name + ", you are already in the game.");
+            return;
         }
+        if (lobby.isFull()) {
+            sendText(chatId, "The lobby is full.");
+            return;
+        }
+        if (!sendText(userId, "You joined a Red Herring game. I will send your secret role here.")) {
+            sendText(chatId, name + ", please open a private chat with me and press Start. Then send /join again.");
+            return;
+        }
+
+        lobby.addPlayer(new Player(userId, name));
+        sendText(chatId, name + " joined. Players: "
+                + lobby.getPlayers().size() + "/" + Lobby.MAX_PLAYERS);
     }
 
-    private void sendText(long chatId, String text) {
+    private boolean sendText(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
                 .text(text)
                 .build();
         try {
             telegramClient.execute(message);
+            return true;
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            return false;
         }
+    }
+
+    private void handleStartGame(Message message) {
+        long chatId = message.getChatId();
+        Optional<Lobby> lobbyOpt = lobbyService.getLobby(chatId);
+
+        if (lobbyOpt.isEmpty()) {
+            sendText(chatId, "No game yet. Send /newgame first.");
+            return;
+        }
+
+        Lobby lobby = lobbyOpt.get();
+        if (!lobby.hasEnoughPlayers()) {
+            sendText(chatId, "Not enough players. You need at least " + Lobby.MIN_PLAYERS + ".");
+            return;
+        }
+
+        Game game = gameService.startGame(chatId, lobby.getPlayers());
+        lobbyService.removeLobby(chatId);
+
+        game.getRoles().forEach((player, role) ->
+                sendText(player.userId(), "Your role: " + role.getTitle() + "\n" + role.getDescription()));
+
+        sendText(chatId, "The game has started! I sent everyone a secret role in private chat. 🤫");
     }
 }

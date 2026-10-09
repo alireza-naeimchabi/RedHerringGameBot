@@ -23,4 +23,8 @@ public class LobbyService
     public Optional<Lobby> getLobby(long chatId) {
         return Optional.ofNullable(lobbies.get(chatId));
     }
+
+    public void removeLobby(long chatId) {
+        lobbies.remove(chatId);
+    }
 }

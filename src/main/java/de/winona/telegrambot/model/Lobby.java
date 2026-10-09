@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class Lobby {
+public class Lobby
+{
 
     public static final int MIN_PLAYERS = 4;
     public static final int MAX_PLAYERS = 7;
@@ -29,5 +30,9 @@ public class Lobby {
 
     public List<Player> getPlayers() {
         return Collections.unmodifiableList(players);
+    }
+
+    public boolean hasEnoughPlayers() {
+        return players.size() >= MIN_PLAYERS;
     }
 }
