@@ -1,11 +1,6 @@
 package de.winona.telegrambot.model;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class Game
 {
@@ -19,12 +14,18 @@ public class Game
     private final List<HintTile> hintTiles = HintDeck.drawTiles();
     private final List<Hint> hints = new ArrayList<>();
 
+    private final Set<Long> usedAccusations = new HashSet<>();
+
     public Game(List<Player> players, Player forcedPlayer, Role forcedRole) {
         List<Player> shuffled = new ArrayList<>(players);
         Collections.shuffle(shuffled);
 
         if (forcedPlayer != null && shuffled.remove(forcedPlayer)) {
-            int index = (forcedRole == Role.FORENSIC_SCIENTIST) ? 0 : 1;
+            int index = switch (forcedRole) {
+                case FORENSIC_SCIENTIST -> 0;
+                case MURDERER -> 1;
+                case INVESTIGATOR -> 2;
+            };
             shuffled.add(index, forcedPlayer);
         }
 
@@ -127,5 +128,39 @@ public class Game
 
     public List<Hint> getHints() {
         return Collections.unmodifiableList(hints);
+    }
+
+
+    public List<Player> getSuspects() {
+        return new ArrayList<>(hands.keySet());
+    }
+
+    public Optional<Player> getPlayer(long userId) {
+        return roles.keySet().stream()
+                .filter(player -> player.userId() == userId)
+                .findFirst();
+    }
+
+    public boolean canAccuse(long userId) {
+        Optional<Player> player = getPlayer(userId);
+        return player.isPresent()
+                && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
+                && allHintsGiven()
+                && !usedAccusations.contains(userId);
+    }
+
+    public boolean accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
+        usedAccusations.add(accuserId);
+        return suspect.equals(getMurderer())
+                && weapon.equals(murderWeapon)
+                && evidence.equals(keyEvidence);
+    }
+
+    public boolean allInvestigatorsDone() {
+        return roles.entrySet().stream()
+                .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
+                .map(Map.Entry::getKey)
+                .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
+                .allMatch(player -> usedAccusations.contains(player.userId()));
     }
 }

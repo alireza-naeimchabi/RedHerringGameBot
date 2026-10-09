@@ -15,9 +15,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -59,6 +57,9 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "/testmurderer" -> handleStartGame(message, Role.MURDERER);
             case "/testscientist" -> handleStartGame(message, Role.FORENSIC_SCIENTIST);
             case "/addtestplayers" -> handleAddTestPlayers(message);
+            case "/testinvestigator" -> handleStartGame(message, Role.INVESTIGATOR);
+            case "/accuse" -> handleAccuse(message);
+            case "/endgame" -> handleEndGame(message);
             default -> { }
         }
     }
@@ -68,6 +69,10 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 
         if (!message.getChat().isGroupChat() && !message.getChat().isSuperGroupChat()) {
             sendText(chatId, "This game only works in a group.");
+            return;
+        }
+        if (gameService.getGame(chatId).isPresent()) {
+            sendText(chatId, "A game is already running. Send /endgame to stop it.");
             return;
         }
 
@@ -206,7 +211,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
                         game.getMurdererHand().weapons(), "W:" + groupChatId + ":"));
     }
 
-    private void handleCallback(CallbackQuery callback) {
+    private void handleCallback(CallbackQuery callback)
+    {
         answerCallback(callback.getId());
 
         String[] parts = callback.getData().split(":");
@@ -225,6 +231,9 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "E" -> handleEvidenceChoice(game, groupChatId, userId, Integer.parseInt(parts[2]));
             case "H" -> handleHintChoice(game, groupChatId, userId,
                     Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+            case "AP" -> handleAccuseSuspect(game, groupChatId, userId, parts);
+            case "AW" -> handleAccuseWeapon(game, groupChatId, userId, parts);
+            case "AE" -> handleAccuseEvidence(game, groupChatId, userId, parts);
             default -> { }
         }
     }
@@ -261,6 +270,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 
     private void announceSolutionChosen(long groupChatId, Game game) {
         String solution = game.getMurderWeapon().name() + " + " + game.getKeyEvidence().name();
+        System.out.println("[TEST] Solution: " + game.getMurderer().name() + " / " + solution);
 
         sendText(game.getMurderer().userId(), "Your choice: " + solution);
         sendText(game.getForensicScientist().userId(),
@@ -325,4 +335,107 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         return text.toString();
     }
 
+
+    private void handleAccuse(Message message) {
+        long chatId = message.getChatId();
+        long userId = message.getFrom().getId();
+        String name = message.getFrom().getFirstName();
+
+        Optional<Game> gameOpt = gameService.getGame(chatId);
+        if (gameOpt.isEmpty()) {
+            sendText(chatId, "There is no running game.");
+            return;
+        }
+
+        Game game = gameOpt.get();
+        if (!game.canAccuse(userId)) {
+            sendText(chatId, name + ", you cannot accuse right now.");
+            return;
+        }
+
+        Map<String, String> buttons = new LinkedHashMap<>();
+        List<Player> suspects = game.getSuspects();
+        for (int i = 0; i < suspects.size(); i++) {
+            if (suspects.get(i).userId() != userId) {
+                buttons.put(suspects.get(i).name(), "AP:" + chatId + ":" + userId + ":" + i);
+            }
+        }
+
+        sendKeyboard(chatId, "⚖️ " + name + ", who is the murderer?",
+                CardKeyboardFactory.createKeyboard(buttons));
+    }
+
+    private void handleAccuseSuspect(Game game, long groupChatId, long userId, String[] parts) {
+        long accuserId = Long.parseLong(parts[2]);
+        int suspectIndex = Integer.parseInt(parts[3]);
+
+        if (userId != accuserId || !game.canAccuse(userId)) {
+            return;
+        }
+
+        Player suspect = game.getSuspects().get(suspectIndex);
+        String prefix = "AW:" + groupChatId + ":" + userId + ":" + suspectIndex + ":";
+        sendKeyboard(groupChatId, "🔪 Which weapon did " + suspect.name() + " use?",
+                CardKeyboardFactory.createCardKeyboard(game.getHands().get(suspect).weapons(), prefix));
+    }
+
+    private void handleAccuseWeapon(Game game, long groupChatId, long userId, String[] parts) {
+        long accuserId = Long.parseLong(parts[2]);
+        int suspectIndex = Integer.parseInt(parts[3]);
+        int weaponIndex = Integer.parseInt(parts[4]);
+
+        if (userId != accuserId || !game.canAccuse(userId)) {
+            return;
+        }
+
+        Player suspect = game.getSuspects().get(suspectIndex);
+        String prefix = "AE:" + groupChatId + ":" + userId + ":" + suspectIndex + ":" + weaponIndex + ":";
+        sendKeyboard(groupChatId, "🔍 Which evidence did " + suspect.name() + " leave behind?",
+                CardKeyboardFactory.createCardKeyboard(game.getHands().get(suspect).evidence(), prefix));
+    }
+
+    private void handleAccuseEvidence(Game game, long groupChatId, long userId, String[] parts) {
+        long accuserId = Long.parseLong(parts[2]);
+        int suspectIndex = Integer.parseInt(parts[3]);
+        int weaponIndex = Integer.parseInt(parts[4]);
+        int evidenceIndex = Integer.parseInt(parts[5]);
+
+        if (userId != accuserId || !game.canAccuse(userId)) {
+            return;
+        }
+
+        Player suspect = game.getSuspects().get(suspectIndex);
+        Hand hand = game.getHands().get(suspect);
+        Card weapon = hand.weapons().get(weaponIndex);
+        Card evidence = hand.evidence().get(evidenceIndex);
+        String accuserName = game.getPlayer(userId).map(Player::name).orElse("Someone");
+
+        boolean correct = game.accuse(userId, suspect, weapon, evidence);
+        String accusation = "⚖️ " + accuserName + " accuses " + suspect.name()
+                + " with " + weapon.name() + " + " + evidence.name() + ".\n\n";
+
+        if (correct) {
+            sendText(groupChatId, accusation + "✅ Correct! The investigators win! 🎉\n"
+                    + buildSolutionText(game));
+            gameService.endGame(groupChatId);
+        } else if (game.allInvestigatorsDone()) {
+            sendText(groupChatId, accusation + "❌ Wrong! Nobody can accuse anymore. The murderer wins! 🔪\n"
+                    + buildSolutionText(game));
+            gameService.endGame(groupChatId);
+        } else {
+            sendText(groupChatId, accusation + "❌ Wrong! The investigation continues.");
+        }
+    }
+
+    private void handleEndGame(Message message) {
+        long chatId = message.getChatId();
+        gameService.endGame(chatId);
+        lobbyService.removeLobby(chatId);
+        sendText(chatId, "Game stopped. Send /newgame to start again.");
+    }
+
+    private String buildSolutionText(Game game) {
+        return "The murderer was " + game.getMurderer().name() + " with "
+                + game.getMurderWeapon().name() + " + " + game.getKeyEvidence().name() + ".";
+    }
 }

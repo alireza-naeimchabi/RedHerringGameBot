@@ -24,4 +24,8 @@ public class GameService
     {
         return Optional.ofNullable(games.get(chatId));
     }
+
+    public void endGame(long chatId) {
+        games.remove(chatId);
+    }
 }

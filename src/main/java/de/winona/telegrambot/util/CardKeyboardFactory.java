@@ -8,6 +8,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.Map;
+
 public class CardKeyboardFactory {
 
     private CardKeyboardFactory() {
@@ -28,6 +30,20 @@ public class CardKeyboardFactory {
                     .build();
             rows.add(new InlineKeyboardRow(button));
         }
+
+        return InlineKeyboardMarkup.builder()
+                .keyboard(rows)
+                .build();
+    }
+
+    public static InlineKeyboardMarkup createKeyboard(Map<String, String> buttons) {
+        List<InlineKeyboardRow> rows = new ArrayList<>();
+
+        buttons.forEach((text, data) -> rows.add(new InlineKeyboardRow(
+                InlineKeyboardButton.builder()
+                        .text(text)
+                        .callbackData(data)
+                        .build())));
 
         return InlineKeyboardMarkup.builder()
                 .keyboard(rows)
