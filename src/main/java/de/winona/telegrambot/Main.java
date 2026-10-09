@@ -1,6 +1,6 @@
 package de.winona.telegrambot;
 
-import de.winona.telegrambot.bot.QuizBot;
+import de.winona.telegrambot.bot.RedHerringBot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
@@ -9,18 +9,20 @@ import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
  * Haupteinstiegspunkt der Telegram Bot Anwendung.
  * Liest die Konfiguration aus Umgebungsvariablen und startet die Long-Polling-Anwendung.
  */
-public class Main {
+public class Main
+{
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private static final String ENV_BOT_TOKEN = "TELEGRAM_BOT_TOKEN";
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         String botToken = fetchBotToken();
 
         log.info("Starte Telegram Bot...");
 
         try (TelegramBotsLongPollingApplication botsApplication = new TelegramBotsLongPollingApplication()) {
-            botsApplication.registerBot(botToken, new QuizBot(botToken));
+            botsApplication.registerBot(botToken, new RedHerringBot(botToken));
             log.info("Bot erfolgreich registriert und gestartet! Drücke Strg+C zum Beenden.");
 
             // Haupt-Thread am Leben halten
