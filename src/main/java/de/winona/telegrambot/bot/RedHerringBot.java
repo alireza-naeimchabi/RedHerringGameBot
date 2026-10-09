@@ -12,6 +12,11 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import de.winona.telegrambot.model.Card;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import java.util.Optional;
 
@@ -21,6 +26,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     private final LobbyService lobbyService = new LobbyService();
     private final TelegramClient telegramClient;
     private final GameService gameService = new GameService();
+
 
     public RedHerringBot(String botToken) {
         this.telegramClient = new OkHttpTelegramClient(botToken);
@@ -41,6 +47,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "/newgame" -> handleNewGame(message);
             case "/join" -> handleJoin(message);
             case "/startgame" -> handleStartGame(message);
+            case "/addtestplayers" -> handleAddTestPlayers(message);
             default -> { }
         }
     }
@@ -104,11 +111,13 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         }
     }
 
-    private void handleStartGame(Message message) {
+    private void handleStartGame(Message message)
+    {
         long chatId = message.getChatId();
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(chatId);
 
-        if (lobbyOpt.isEmpty()) {
+        if (lobbyOpt.isEmpty())
+        {
             sendText(chatId, "No game yet. Send /newgame first.");
             return;
         }
@@ -126,5 +135,41 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
                 sendText(player.userId(), "Your role: " + role.getTitle() + "\n" + role.getDescription()));
 
         sendText(chatId, "The game has started! I sent everyone a secret role in private chat. 🤫");
+        sendText(chatId, buildCardOverview(game));
+    }
+
+    private void handleAddTestPlayers(Message message) {
+        long chatId = message.getChatId();
+        Optional<Lobby> lobbyOpt = lobbyService.getLobby(chatId);
+
+        if (lobbyOpt.isEmpty()) {
+            sendText(chatId, "No game yet. Send /newgame first.");
+            return;
+        }
+
+        Lobby lobby = lobbyOpt.get();
+        lobby.addPlayer(new Player(-1, "Test Anna"));
+        lobby.addPlayer(new Player(-2, "Test Ben"));
+        lobby.addPlayer(new Player(-3, "Test Clara"));
+        sendText(chatId, "Added 3 test players. Players: "
+                + lobby.getPlayers().size() + "/" + Lobby.MAX_PLAYERS);
+    }
+
+    private String buildCardOverview(Game game) {
+        StringBuilder text = new StringBuilder("🗂 Cards on the table\n");
+
+        game.getHands().forEach((player, hand) -> {
+            text.append("\n👤 ").append(player.name()).append("\n");
+            text.append("🔪 ").append(cardNames(hand.weapons())).append("\n");
+            text.append("🔍 ").append(cardNames(hand.evidence())).append("\n");
+        });
+
+        return text.toString();
+    }
+
+    private String cardNames(List<Card> cards) {
+        return cards.stream()
+                .map(Card::name)
+                .collect(Collectors.joining(", "));
     }
 }
