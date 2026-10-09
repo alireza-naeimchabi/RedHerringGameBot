@@ -1,24 +1,25 @@
 package de.winona.telegrambot.bot;
 
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Lobby;
-import de.winona.telegrambot.model.Player;
+import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
+import de.winona.telegrambot.util.CardKeyboardFactory;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-import de.winona.telegrambot.model.Card;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
 
-import java.util.Optional;
 
 public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 {
@@ -33,8 +34,16 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     }
 
     @Override
-    public void consume(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) {
+    public void consume(Update update)
+    {
+        if (update.hasCallbackQuery())
+        {
+            handleCallback(update.getCallbackQuery());
+            return;
+        }
+
+        if (!update.hasMessage() || !update.getMessage().hasText())
+        {
             return;
         }
 
@@ -46,7 +55,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "/start" -> sendText(chatId, "Welcome to Red Herring! 🕵️ Add me to a group and send /newgame.");
             case "/newgame" -> handleNewGame(message);
             case "/join" -> handleJoin(message);
-            case "/startgame" -> handleStartGame(message);
+            case "/startgame" -> handleStartGame(message, false);
+            case "/testmurderer" -> handleStartGame(message, true);
             case "/addtestplayers" -> handleAddTestPlayers(message);
             default -> { }
         }
@@ -111,7 +121,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         }
     }
 
-    private void handleStartGame(Message message)
+    private void handleStartGame(Message message, boolean senderIsMurderer)
     {
         long chatId = message.getChatId();
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(chatId);
@@ -123,12 +133,16 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         }
 
         Lobby lobby = lobbyOpt.get();
-        if (!lobby.hasEnoughPlayers()) {
+        if (!lobby.hasEnoughPlayers())
+        {
             sendText(chatId, "Not enough players. You need at least " + Lobby.MIN_PLAYERS + ".");
             return;
         }
 
-        Game game = gameService.startGame(chatId, lobby.getPlayers());
+        Player forcedMurderer = senderIsMurderer
+                ? new Player(message.getFrom().getId(), message.getFrom().getFirstName())
+                : null;
+        Game game = gameService.startGame(chatId, lobby.getPlayers(), forcedMurderer);
         lobbyService.removeLobby(chatId);
 
         game.getRoles().forEach((player, role) ->
@@ -136,6 +150,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 
         sendText(chatId, "The game has started! I sent everyone a secret role in private chat. 🤫");
         sendText(chatId, buildCardOverview(game));
+        startMurdererChoice(chatId, game);
     }
 
     private void handleAddTestPlayers(Message message) {
@@ -172,4 +187,84 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
                 .map(Card::name)
                 .collect(Collectors.joining(", "));
     }
+
+
+    private void startMurdererChoice(long groupChatId, Game game) {
+        Player murderer = game.getMurderer();
+
+        if (murderer.userId() < 0) {
+            Random random = new Random();
+            game.chooseWeapon(random.nextInt(CardDeck.CARDS_PER_TYPE));
+            game.chooseEvidence(random.nextInt(CardDeck.CARDS_PER_TYPE));
+            announceSolutionChosen(groupChatId, game);
+            return;
+        }
+
+        sendKeyboard(murderer.userId(), "🔪 Choose your murder weapon:",
+                CardKeyboardFactory.createCardKeyboard(
+                        game.getMurdererHand().weapons(), "W:" + groupChatId + ":"));
+    }
+
+    private void handleCallback(CallbackQuery callback) {
+        answerCallback(callback.getId());
+
+        String[] parts = callback.getData().split(":");
+        String type = parts[0];
+        long groupChatId = Long.parseLong(parts[1]);
+        int index = Integer.parseInt(parts[2]);
+        long userId = callback.getFrom().getId();
+
+        Optional<Game> gameOpt = gameService.getGame(groupChatId);
+        if (gameOpt.isEmpty()) {
+            return;
+        }
+
+        Game game = gameOpt.get();
+        if (game.getMurderer().userId() != userId) {
+            return;
+        }
+
+        if (type.equals("W") && !game.hasWeapon()) {
+            game.chooseWeapon(index);
+            sendKeyboard(userId, "🔍 Choose the evidence you left behind:",
+                    CardKeyboardFactory.createCardKeyboard(
+                            game.getMurdererHand().evidence(), "E:" + groupChatId + ":"));
+        } else if (type.equals("E") && game.hasWeapon() && !game.hasSolution()) {
+            game.chooseEvidence(index);
+            announceSolutionChosen(groupChatId, game);
+        }
+    }
+
+    private void announceSolutionChosen(long groupChatId, Game game) {
+        String solution = game.getMurderWeapon().name() + " + " + game.getKeyEvidence().name();
+
+        sendText(game.getMurderer().userId(), "Your choice: " + solution);
+        sendText(game.getForensicScientist().userId(),
+                "The murderer is " + game.getMurderer().name() + ".\nSolution: " + solution);
+        sendText(groupChatId, "🔪 The murderer has made a choice. The investigation begins!");
+    }
+
+    private void sendKeyboard(long chatId, String text, InlineKeyboardMarkup keyboard) {
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId)
+                .text(text)
+                .replyMarkup(keyboard)
+                .build();
+        try {
+            telegramClient.execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void answerCallback(String callbackId) {
+        try {
+            telegramClient.execute(AnswerCallbackQuery.builder()
+                    .callbackQueryId(callbackId)
+                    .build());
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

@@ -12,10 +12,18 @@ public class Game
     private final Map<Player, Role> roles = new LinkedHashMap<>();
     private final Map<Player, Hand> hands = new LinkedHashMap<>();
 
-    public Game(List<Player> players)
+    private Card murderWeapon;
+    private Card keyEvidence;
+
+    public Game(List<Player> players, Player forcedMurderer)
     {
         List<Player> shuffled = new ArrayList<>(players);
         Collections.shuffle(shuffled);
+
+        if (forcedMurderer != null && shuffled.remove(forcedMurderer))
+        {
+            shuffled.add(1, forcedMurderer);
+        }
 
         for (int i = 0; i < shuffled.size(); i++)
         {
@@ -44,5 +52,51 @@ public class Game
 
     public Map<Player, Hand> getHands() {
         return Collections.unmodifiableMap(hands);
+    }
+
+    public Player getMurderer() {
+        return findPlayer(Role.MURDERER);
+    }
+
+    public Player getForensicScientist() {
+        return findPlayer(Role.FORENSIC_SCIENTIST);
+    }
+
+    private Player findPlayer(Role role) {
+        return roles.entrySet().stream()
+                .filter(entry -> entry.getValue() == role)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    //Murderacts
+
+    public Hand getMurdererHand() {
+        return hands.get(getMurderer());
+    }
+
+    public void chooseWeapon(int index) {
+        murderWeapon = getMurdererHand().weapons().get(index);
+    }
+
+    public void chooseEvidence(int index) {
+        keyEvidence = getMurdererHand().evidence().get(index);
+    }
+
+    public boolean hasWeapon() {
+        return murderWeapon != null;
+    }
+
+    public boolean hasSolution() {
+        return murderWeapon != null && keyEvidence != null;
+    }
+
+    public Card getMurderWeapon() {
+        return murderWeapon;
+    }
+
+    public Card getKeyEvidence() {
+        return keyEvidence;
     }
 }
