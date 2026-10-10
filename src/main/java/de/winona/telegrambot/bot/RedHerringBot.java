@@ -77,7 +77,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             return;
         }
 
-        if (lobbyService.createLobby(chatId)) {
+        Player host = new Player(message.getFrom().getId(), message.getFrom().getFirstName());
+        if (lobbyService.createLobby(chatId, message.getChat().getTitle(), host).isPresent()) {
             sendText(chatId, "New game created! Send /join to take part.");
         } else {
             sendText(chatId, "There is already a game in this group.");
@@ -150,7 +151,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
                 ? new Player(message.getFrom().getId(), message.getFrom().getFirstName())
                 : null;
         Game game = gameService.startGame(chatId, lobby.getPlayers(), forcedPlayer, forcedRole);
-        lobbyService.removeLobby(chatId);
+        lobbyService.removeLobby(chatId, RoomEnd.CASE_STARTED);
 
         game.getRoles().forEach((player, role) ->
                 sendText(player.userId(), "Your role: " + role.getTitle() + "\n" + role.getDescription()));
@@ -441,7 +442,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     private void handleEndGame(Message message) {
         long chatId = message.getChatId();
         gameService.endGame(chatId);
-        lobbyService.removeLobby(chatId);
+        lobbyService.removeLobby(chatId, RoomEnd.CLOSED_BY_HOST);
         sendText(chatId, "Game stopped. Send /newgame to start again.");
     }
 
