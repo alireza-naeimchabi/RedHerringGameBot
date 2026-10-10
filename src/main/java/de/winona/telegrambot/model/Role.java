@@ -1,27 +1,11 @@
 package de.winona.telegrambot.model;
 
+/**
+ * The roles of a case. Their names and descriptions are texts and live in the translation
+ * files under "role.&lt;name&gt;", see {@link de.winona.telegrambot.i18n.Texts#role}.
+ */
 public enum Role {
-
-    FORENSIC_SCIENTIST("Forensic Scientist",
-            "You know the solution, but you may never talk about it. You answer only through the scene tiles."),
-    MURDERER("Murderer",
-            "Choose your Means of Murder and your Key Evidence in secret. Do not get caught."),
-    INVESTIGATOR("Investigator",
-            "Find the murderer, the Means of Murder and the Key Evidence.");
-
-    private final String title;
-    private final String description;
-
-    Role(String title, String description) {
-        this.title = title;
-        this.description = description;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
+    FORENSIC_SCIENTIST,
+    MURDERER,
+    INVESTIGATOR
 }

@@ -4,19 +4,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * The design tokens of the interface: names, icons and text helpers.
- * Every screen uses these, so wording and symbols stay the same everywhere.
+ * The design tokens of the interface: icons and formatting helpers.
+ * Icons are the same in every language. All words come from {@link de.winona.telegrambot.i18n.Texts}.
  */
 public final class Theme {
-
-    // Brand
-    public static final String TITLE = "DECEPTION";
-    public static final String SUBTITLE = "MURDER IN HONG KONG";
-    public static final String HEADLINE = "Every clue hides a secret.";
-    public static final String TAGLINE = "Gather your friends, investigate the evidence, "
-            + "and uncover the truth before the murderer escapes.";
-    public static final String FAN_NOTE = "Fan-made adaptation of the board game "
-            + "Deception: Murder in Hong Kong. Not affiliated with its publisher.";
 
     // Icons: one meaning per icon
     public static final String ICON_HOME = "🏠";
@@ -32,6 +23,11 @@ public final class Theme {
     public static final String ICON_CLUE = "🔍";
     public static final String ICON_SCIENTIST = "🧪";
     public static final String ICON_ACCUSE = "⚖️";
+    public static final String ICON_LAB = "🔬";
+    public static final String ICON_TRACE = "🩸";
+    public static final String ICON_CLEAN = "▫️";
+    public static final String ICON_HERRING = "🐟";
+    public static final String ICON_LANGUAGE = "🌐";
     public static final String ICON_ROUND = "🔔";
     public static final String ICON_SECRET = "🤫";
     public static final String ICON_OK = "✅";
@@ -59,6 +55,11 @@ public final class Theme {
 
     public static String italic(String text) {
         return "<i>" + esc(text) + "</i>";
+    }
+
+    /** Crossed-out text, used for cards the lab has cleared. */
+    public static String struck(String text) {
+        return "<s>" + esc(text) + "</s>";
     }
 
     public static String code(String text) {
@@ -95,29 +96,5 @@ public final class Theme {
             return Character.toString(0x24B6 + (first - 'A'));
         }
         return "(" + esc(Character.toString(first)) + ")";
-    }
-
-    /** Rank title earned by the number of won cases. */
-    public static String rankTitle(int wins) {
-        if (wins >= 30) {
-            return "Superintendent";
-        }
-        if (wins >= 15) {
-            return "Chief Inspector";
-        }
-        if (wins >= 8) {
-            return "Inspector";
-        }
-        if (wins >= 3) {
-            return "Detective";
-        }
-        if (wins >= 1) {
-            return "Constable";
-        }
-        return "Recruit";
-    }
-
-    public static String plural(int count, String singular, String plural) {
-        return count + " " + (count == 1 ? singular : plural);
     }
 }

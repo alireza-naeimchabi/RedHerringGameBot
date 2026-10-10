@@ -1,27 +1,32 @@
 package de.winona.telegrambot.ui;
 
+import de.winona.telegrambot.i18n.Msg;
+import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.Card;
+import de.winona.telegrambot.model.CardType;
 import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Hand;
 import de.winona.telegrambot.model.Hint;
 import de.winona.telegrambot.model.HintTile;
+import de.winona.telegrambot.model.LabResult;
 import de.winona.telegrambot.model.Lobby;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.Role;
 import de.winona.telegrambot.model.Room;
 import de.winona.telegrambot.model.RoomEnd;
+import de.winona.telegrambot.model.TileSubject;
 import de.winona.telegrambot.util.CardKeyboardFactory;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static de.winona.telegrambot.ui.Keyboard.button;
 import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.MenuScreens.shorten;
 import static de.winona.telegrambot.ui.Theme.bold;
 import static de.winona.telegrambot.ui.Theme.code;
 import static de.winona.telegrambot.ui.Theme.esc;
@@ -31,476 +36,706 @@ import static de.winona.telegrambot.ui.Theme.note;
 
 /**
  * The screens of a room and a running case: the room card in the group, the private role
- * messages, the scene report, the accusation and the verdict.
+ * messages, the scene report, the lab, the accusation and the verdict.
+ * The first parameter is always the {@link Texts} of the language to write in.
  */
 public final class GameScreens {
 
     private static final int NAME_LENGTH = 22;
     private static final int TITLE_LENGTH = 32;
-    private static final String PRACTICE_NOTE = "Practice case. It is not counted in the statistics.";
 
     private GameScreens() {
     }
 
     // ---------------------------------------------------------------- Room card (group)
 
-    public static Screen lobbyCard(Lobby lobby, String botUsername) {
+    public static Screen lobbyCard(Texts t, Lobby lobby, String botUsername) {
         RoomSummary room = RoomSummary.of(lobby);
         String roomCode = room.code();
 
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_ROOMS, "ROOM " + roomCode,
-                shorten(lobby.getRoom().groupTitle(), TITLE_LENGTH))).append("\n\n");
-        text.append(Theme.ICON_WAITING).append(" Waiting for detectives\n");
+        text.append(heading(Theme.ICON_ROOMS, t.get("room.title", roomCode),
+                t.plainName(lobby.getRoom().groupTitle(), TITLE_LENGTH))).append("\n\n");
+        text.append(Theme.ICON_WAITING).append(" ").append(t.get("room.status.waiting")).append("\n");
         text.append(Theme.seats(lobby.getPlayers().size(), Lobby.MAX_PLAYERS)).append("  ")
-                .append(lobby.getPlayers().size()).append(" of ").append(Lobby.MAX_PLAYERS)
-                .append(" seated\n\n");
-        text.append(MenuScreens.playerList(lobby.getPlayers(), room)).append("\n");
+                .append(t.get("room.seats", lobby.getPlayers().size(), Lobby.MAX_PLAYERS)).append("\n\n");
+        text.append(MenuScreens.playerList(t, lobby.getPlayers(), room)).append("\n");
         text.append(note(lobby.hasEnoughPlayers()
-                ? "Ready. " + esc(name(lobby.getRoom().host())) + " can open the case."
-                : "Needs " + Theme.plural(lobby.missingPlayers(), "more detective", "more detectives")
-                        + " before the case can open."));
-        text.append("\nRoom code ").append(code(roomCode));
+                ? t.get("lobby.ready", esc(name(t, lobby.getRoom().host())))
+                : t.plural("room.note.missing", lobby.missingPlayers())));
+        text.append("\n").append(t.get("lobby.code", code(roomCode)));
 
         Keyboard keyboard = Keyboard.create()
-                .row(button(Theme.ICON_JOIN + " Join Room", Callbacks.joinRoom(roomCode)),
-                        button("Leave Room", Callbacks.leaveRoom(roomCode)))
-                .row(button("▶️ Open the Case", Callbacks.startRoom(roomCode)));
+                .row(button(Theme.ICON_JOIN + " " + t.get("btn.join_room"), Callbacks.joinRoom(roomCode)),
+                        button(t.get("btn.leave_room"), Callbacks.leaveRoom(roomCode)))
+                .row(button("▶️ " + t.get("btn.open_case"), Callbacks.startRoom(roomCode)));
         if (botUsername != null && !botUsername.isBlank()) {
-            keyboard.row(link(Theme.ICON_HOW_TO + " How to Play", "https://t.me/" + botUsername + "?start=how"),
-                    button("Close Room", Callbacks.closeRoom(roomCode)));
+            keyboard.row(link(Theme.ICON_HOW_TO + " " + t.get("btn.how_to_play"),
+                            "https://t.me/" + botUsername + "?start=how"),
+                    button(t.get("btn.close_room"), Callbacks.closeRoom(roomCode)));
         } else {
-            keyboard.row(button("Close Room", Callbacks.closeRoom(roomCode)));
+            keyboard.row(button(t.get("btn.close_room"), Callbacks.closeRoom(roomCode)));
         }
-        return Screen.text(text.toString(), keyboard.build());
+        return t.text(text.toString(), keyboard.build());
     }
 
     /** Replaces the room card when the room can no longer be joined. */
-    public static Screen roomEnded(String roomCode, RoomEnd reason) {
+    public static Screen roomEnded(Texts t, String roomCode, RoomEnd reason) {
         return switch (reason) {
-            case CLOSED_BY_HOST -> Screen.text(Theme.ICON_ROOMS + " " + bold("ROOM " + roomCode + " IS CLOSED")
-                    + "\n\nThe host closed this room. Its code no longer works.", newRoomKeyboard());
-            case EXPIRED -> Screen.text(Theme.ICON_ROOMS + " " + bold("ROOM " + roomCode + " HAS EXPIRED")
-                    + "\n\nNobody opened the case in time. Its code no longer works.", newRoomKeyboard());
-            case CASE_STARTED -> Screen.text(Theme.ICON_LIVE + " " + bold("ROOM " + roomCode + " IS LOCKED")
-                    + "\n\nThe seats are taken and the case is open.");
+            case CLOSED_BY_HOST -> t.text(Theme.ICON_ROOMS + " " + bold(t.get("ended.closed.title", roomCode))
+                    + "\n\n" + t.get("ended.closed.body"), newRoomKeyboard(t));
+            case EXPIRED -> t.text(Theme.ICON_ROOMS + " " + bold(t.get("ended.expired.title", roomCode))
+                    + "\n\n" + t.get("ended.expired.body"), newRoomKeyboard(t));
+            case CASE_STARTED -> t.text(Theme.ICON_LIVE + " " + bold(t.get("ended.started.title", roomCode))
+                    + "\n\n" + t.get("ended.started.body"));
         };
     }
 
-    private static InlineKeyboardMarkup newRoomKeyboard() {
+    private static InlineKeyboardMarkup newRoomKeyboard(Texts t) {
         return Keyboard.create()
-                .row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.newRoomHere()))
+                .row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.newRoomHere()))
                 .build();
     }
 
+    /** Shown in a group that has neither a room nor a case. */
+    public static Screen noRoomHere(Texts t) {
+        return t.text(Theme.ICON_ROOMS + " " + t.get("group.no_room"), newRoomKeyboard(t));
+    }
+
+    /** One line, for example a problem with a command. */
+    public static Screen notice(Texts t, String icon, Msg message) {
+        return t.text(icon + " " + esc(t.get(message)));
+    }
+
     /** Private confirmation after taking a seat. */
-    public static Screen seatTaken(Lobby lobby) {
+    public static Screen seatTaken(Texts t, Lobby lobby) {
         Room room = lobby.getRoom();
-        String text = Theme.ICON_OK + " " + bold("You are seated in room " + room.code()) + "\n"
-                + italic(shorten(room.groupTitle(), TITLE_LENGTH)) + "\n\n"
-                + "Your secret role arrives in this chat when the host opens the case. "
-                + "The discussion happens in the group.";
-        return Screen.text(text, Keyboard.create()
-                .row(button("Enter Room " + room.code(), Callbacks.roomDetails(room.code())),
-                        button(Theme.ICON_HOW_TO + " How to Play", Callbacks.howToPlay(1)))
+        String text = Theme.ICON_OK + " " + bold(t.get("seat.title", room.code())) + "\n"
+                + italic(t.plainName(room.groupTitle(), TITLE_LENGTH)) + "\n\n"
+                + t.get("seat.body");
+        return t.text(text, Keyboard.create()
+                .row(button(t.get("btn.enter_room_code", room.code()), Callbacks.roomDetails(room.code())),
+                        button(Theme.ICON_HOW_TO + " " + t.get("btn.how_to_play"), Callbacks.howToPlay(1)))
+                .build());
+    }
+
+    /** Asks a player in the group to open the private chat, which also seats them. */
+    public static Screen needsPrivateChat(Texts t, String firstName, String deepLink) {
+        String text = Theme.ICON_SECRET + " "
+                + t.get("group.needs_private", bold(t.plainName(firstName, NAME_LENGTH)));
+        if (deepLink == null) {
+            return t.text(text);
+        }
+        return t.text(text, Keyboard.create()
+                .row(link(t.get("btn.open_private_chat"), deepLink))
+                .build());
+    }
+
+    /** The short rules for the group, with a link to the full guide in the private chat. */
+    public static Screen groupHelp(Texts t, String deepLink) {
+        String text = heading(Theme.ICON_HOW_TO, t.get("how.title"), t.get("group.help.sub")) + "\n\n"
+                + t.get("group.help.body");
+        if (deepLink == null) {
+            return t.text(text);
+        }
+        return t.text(text, Keyboard.create()
+                .row(link(Theme.ICON_HOW_TO + " " + t.get("btn.full_guide"), deepLink))
                 .build());
     }
 
     // ---------------------------------------------------------------- Case opening
 
-    public static Screen caseOpened(Game game) {
+    public static Screen caseOpened(Texts t, Game game) {
         String suspects = game.getSuspects().stream()
-                .map(player -> esc(name(player)))
-                .collect(Collectors.joining(", "));
+                .map(player -> esc(name(t, player)))
+                .collect(Collectors.joining(t.get("common.list_separator")));
 
         StringBuilder text = new StringBuilder();
-        text.append(Theme.ICON_LIVE).append(" ").append(bold("CASE " + game.getRoom().code() + " IS OPEN"))
-                .append("\n").append(italic("Round 1 of " + Game.MAX_ROUNDS)).append("\n\n");
-        text.append("Roles have been dealt in private. ").append(Theme.ICON_SECRET).append("\n\n");
-        text.append(Theme.ICON_SCIENTIST).append(" Forensic Scientist: ")
-                .append(bold(name(game.getForensicScientist()))).append("\n");
-        text.append("They know the solution and answer only through the scene tiles.\n\n");
-        text.append("Suspects: ").append(suspects).append("\n\n");
-        text.append(italic("The murderer is choosing the Means of Murder and the Key Evidence."));
+        text.append(Theme.ICON_LIVE).append(" ").append(bold(t.get("case.open.title", game.getRoom().code())))
+                .append("\n").append(italic(t.get("case.round", 1, Game.MAX_ROUNDS))).append("\n\n");
+        text.append(t.get("case.open.dealt")).append(" ").append(Theme.ICON_SECRET).append("\n\n");
+        text.append(Theme.ICON_SCIENTIST).append(" ")
+                .append(t.get("case.open.scientist", bold(name(t, game.getForensicScientist())))).append("\n");
+        text.append(t.get("case.open.scientist_note")).append("\n\n");
+        text.append(t.get("case.open.suspects", suspects)).append("\n\n");
+        text.append(italic(t.get("case.open.choosing")));
         if (game.isPractice()) {
-            text.append("\n\n").append(note(PRACTICE_NOTE));
+            text.append("\n\n").append(note(t.get("case.practice")));
         }
-        return Screen.withBanner(Banner.CASE_OPEN, text.toString(), null);
+        return t.banner(Banner.CASE_OPEN, text.toString(), null);
     }
 
-    public static Screen evidenceBoard(Game game) {
+    public static Screen evidenceBoard(Texts t, Game game) {
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_ROOMS, "EVIDENCE BOARD", "Case " + game.getRoom().code())).append("\n");
+        text.append(heading(Theme.ICON_ROOMS, t.get("board.title"), t.get("board.sub", game.getRoom().code())))
+                .append("\n");
 
         game.getHands().forEach((player, hand) -> {
-            text.append("\n").append(bold(name(player))).append("\n");
-            text.append(Theme.ICON_MEANS).append(" ").append(cardNames(hand.weapons())).append("\n");
-            text.append(Theme.ICON_CLUE).append(" ").append(cardNames(hand.evidence())).append("\n");
+            text.append("\n").append(bold(name(t, player))).append("\n");
+            text.append(Theme.ICON_MEANS).append(" ").append(cardNames(t, game, hand.weapons())).append("\n");
+            text.append(Theme.ICON_CLUE).append(" ").append(cardNames(t, game, hand.evidence())).append("\n");
         });
-        text.append("\n").append(italic("One means card and one clue card of the same player are the solution."));
-        return Screen.text(text.toString());
+        text.append("\n").append(italic(t.get("board.rule")));
+        if (!game.getLabResults().isEmpty()) {
+            text.append("\n").append(Theme.ICON_TRACE).append(" ").append(t.get("board.legend.trace"))
+                    .append("   ").append(Theme.struck(t.get("board.legend.struck"))).append(" ")
+                    .append(t.get("board.legend.cleared"));
+        }
+        return t.text(text.toString());
     }
 
-    private static String cardNames(List<Card> cards) {
+    /** Card names with the lab's findings: cleared cards are crossed out, cards with a trace stand out. */
+    private static String cardNames(Texts t, Game game, List<Card> cards) {
         return cards.stream()
-                .map(card -> esc(card.name()))
-                .collect(Collectors.joining(", "));
+                .map(card -> game.findLabResult(card)
+                        .map(result -> result.trace()
+                                ? Theme.ICON_TRACE + bold(t.card(card))
+                                : Theme.struck(t.card(card)))
+                        .orElse(esc(t.card(card))))
+                .collect(Collectors.joining(t.get("common.list_separator")));
     }
 
     /** The private message that tells a player their role. */
-    public static Screen roleBriefing(Game game, Role role) {
-        String nextStep = switch (role) {
-            case FORENSIC_SCIENTIST -> "Wait for the murderer's choice. Then I show you the solution "
-                    + "and the first scene tile here.";
-            case MURDERER -> "Pick your two cards below. Then join the discussion in the group "
-                    + "and act like an investigator.";
-            case INVESTIGATOR -> "Watch the scene report in the group. Use " + bold("Solve the Crime")
-                    + " once, when you are sure.";
-        };
-        String text = Theme.ICON_SECRET + " " + bold("YOUR ROLE: " + role.getTitle().toUpperCase()) + "\n"
-                + italic("Case " + game.getRoom().code() + ", "
-                        + shorten(game.getRoom().groupTitle(), TITLE_LENGTH)) + "\n\n"
-                + esc(role.getDescription()) + "\n\n"
-                + note(nextStep);
-        return Screen.text(text);
+    public static Screen roleBriefing(Texts t, Game game, Role role) {
+        String roleKey = role.name().toLowerCase(Locale.ROOT);
+        String text = Theme.ICON_SECRET + " "
+                + bold(t.get("brief.title", t.role(role).toUpperCase(Locale.ROOT))) + "\n"
+                + italic(t.get("brief.sub", game.getRoom().code(),
+                        t.plainName(game.getRoom().groupTitle(), TITLE_LENGTH))) + "\n\n"
+                + esc(t.roleDescription(role)) + "\n\n"
+                + note(t.get("brief.next." + roleKey));
+        return t.text(text);
     }
 
     // ---------------------------------------------------------------- Murderer (private)
 
-    public static Screen chooseMeans(Game game) {
+    public static Screen chooseMeans(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
-        String text = Theme.ICON_MEANS + " " + bold("CHOOSE THE MEANS OF MURDER") + "\n"
-                + italic("Step 1 of 2") + "\n\n"
-                + "Which of your means cards did you use? Nobody else sees this choice.";
-        return Screen.text(text, CardKeyboardFactory.createCardKeyboard(
+        String text = Theme.ICON_MEANS + " " + bold(t.get("murder.means.title")) + "\n"
+                + italic(t.get("common.step", 1, 5)) + "\n\n"
+                + t.get("murder.means.body");
+        return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
                 game.getMurdererHand().weapons(), Callbacks.game(Callbacks.WEAPON, chatId) + Callbacks.SEPARATOR));
     }
 
-    public static Screen chooseKeyEvidence(Game game) {
+    public static Screen chooseKeyEvidence(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
-        String text = Theme.ICON_CLUE + " " + bold("CHOOSE THE KEY EVIDENCE") + "\n"
-                + italic("Step 2 of 2") + "\n\n"
-                + "Means of Murder: " + bold(game.getMurderWeapon().name()) + "\n\n"
-                + "Which of your clue cards did you leave behind?";
-        return Screen.text(text, CardKeyboardFactory.createCardKeyboard(
+        String text = Theme.ICON_CLUE + " " + bold(t.get("murder.clue.title")) + "\n"
+                + italic(t.get("common.step", 2, 5)) + "\n\n"
+                + t.get("term.means_label", bold(t.card(game.getMurderWeapon()))) + "\n\n"
+                + t.get("murder.clue.body");
+        return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
                 game.getMurdererHand().evidence(), Callbacks.game(Callbacks.EVIDENCE, chatId) + Callbacks.SEPARATOR));
     }
 
-    public static Screen crimeSealed(Game game) {
-        String text = Theme.ICON_OK + " " + bold("THE CRIME IS SEALED") + "\n\n"
-                + Theme.ICON_MEANS + " Means of Murder: " + bold(game.getMurderWeapon().name()) + "\n"
-                + Theme.ICON_CLUE + " Key Evidence: " + bold(game.getKeyEvidence().name()) + "\n\n"
-                + note("Return to the group and blend in. You win if nobody names you with both cards.");
-        return Screen.text(text);
+    public static Screen chooseScapegoat(Texts t, Game game) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
+                + italic(t.get("common.step", 3, 5)) + "\n\n"
+                + t.get("frame.who.cards", bold(t.card(game.getMurderWeapon())),
+                        bold(t.card(game.getKeyEvidence()))) + "\n\n"
+                + t.get("frame.who.body");
+
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Player> others = game.getPossibleScapegoats();
+        for (int i = 0; i < others.size(); i++) {
+            buttons.add(button(name(t, others.get(i)), Callbacks.game(Callbacks.FRAME_PLAYER, chatId, i)));
+        }
+        return t.text(text, Keyboard.create().grid(buttons, CardKeyboardFactory.COLUMNS).build());
     }
 
-    public static Screen crimeCommitted() {
-        return Screen.text(Theme.ICON_MEANS + " " + bold("The crime has been committed.") + "\n"
-                + "The Forensic Scientist is examining the scene. The first answers arrive shortly.");
+    public static Screen choosePlantedMeans(Texts t, Game game) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
+                + italic(t.get("common.step", 4, 5)) + "\n\n"
+                + t.get("frame.means.intro", bold(name(t, game.getScapegoat())),
+                        bold(t.card(game.getMurderWeapon()))) + "\n\n"
+                + t.get("frame.means.ask") + " " + italic(t.get("frame.means.tip"));
+        return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
+                game.getScapegoatHand().weapons(), Callbacks.game(Callbacks.FRAME_MEANS, chatId) + Callbacks.SEPARATOR));
+    }
+
+    public static Screen choosePlantedClue(Texts t, Game game) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
+                + italic(t.get("common.step", 5, 5)) + "\n\n"
+                + t.get("frame.clue.intro", bold(t.card(game.getPlantedMeans())),
+                        bold(t.card(game.getKeyEvidence()))) + "\n\n"
+                + t.get("frame.clue.ask");
+        return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
+                game.getScapegoatHand().evidence(), Callbacks.game(Callbacks.FRAME_CLUE, chatId) + Callbacks.SEPARATOR));
+    }
+
+    public static Screen crimeSealed(Texts t, Game game) {
+        String scapegoat = name(t, game.getScapegoat());
+        String text = Theme.ICON_OK + " " + bold(t.get("sealed.title")) + "\n\n"
+                + bold(t.get("sealed.crime")) + "\n"
+                + Theme.ICON_MEANS + " " + esc(t.card(game.getMurderWeapon())) + "   "
+                + Theme.ICON_CLUE + " " + esc(t.card(game.getKeyEvidence())) + "\n\n"
+                + bold(t.get("sealed.herring", scapegoat)) + "\n"
+                + Theme.ICON_MEANS + " " + esc(t.card(game.getPlantedMeans())) + "   "
+                + Theme.ICON_CLUE + " " + esc(t.card(game.getPlantedClue())) + "\n\n"
+                + note(t.get("sealed.note", esc(scapegoat)));
+        return t.text(text);
+    }
+
+    public static Screen crimeCommitted(Texts t) {
+        return t.text(Theme.ICON_MEANS + " " + bold(t.get("crime.committed.title")) + "\n"
+                + t.get("crime.committed.body"));
     }
 
     // ---------------------------------------------------------------- Forensic Scientist (private)
 
-    public static Screen solutionForScientist(Game game) {
-        String text = Theme.ICON_SCIENTIST + " " + bold("THE SOLUTION") + "\n"
-                + italic("For your eyes only") + "\n\n"
-                + "Murderer: " + bold(name(game.getMurderer())) + "\n"
-                + Theme.ICON_MEANS + " Means of Murder: " + bold(game.getMurderWeapon().name()) + "\n"
-                + Theme.ICON_CLUE + " Key Evidence: " + bold(game.getKeyEvidence().name()) + "\n\n"
-                + note("Guide the investigators with your answers. Never reveal anything in words.");
-        return Screen.text(text);
+    public static Screen solutionForScientist(Texts t, Game game) {
+        String text = Theme.ICON_SCIENTIST + " " + bold(t.get("sci.solution.title")) + "\n"
+                + italic(t.get("sci.solution.sub")) + "\n\n"
+                + t.get("term.murderer_label", bold(name(t, game.getMurderer()))) + "\n"
+                + Theme.ICON_MEANS + " " + t.get("term.means_label", bold(t.card(game.getMurderWeapon()))) + "\n"
+                + Theme.ICON_CLUE + " " + t.get("term.evidence_label", bold(t.card(game.getKeyEvidence()))) + "\n\n"
+                + note(t.get("sci.note") + "\n" + Theme.ICON_HERRING + " " + t.get("sci.herring_note"));
+        return t.text(text);
     }
 
     /** The scene tile the Forensic Scientist answers next, with the answers given so far. */
-    public static Screen sceneTile(Game game, HintTile tile) {
+    public static Screen sceneTile(Texts t, Game game, HintTile tile) {
         long chatId = game.getRoom().groupChatId();
         int number = game.getCurrentHintIndex() + 1;
-        int total = game.getTileCount();
 
         StringBuilder text = new StringBuilder();
-        text.append(Theme.ICON_SCIENTIST).append(" ").append(bold("SCENE TILE " + number + " OF " + total))
-                .append("\n\n");
-        text.append(hintLines(game.getHints()));
+        text.append(Theme.ICON_SCIENTIST).append(" ")
+                .append(bold(t.get("tile.heading", number, game.getTileCount()))).append("\n\n");
+        text.append(hintLines(t, game.getHints()));
         if (!game.getHints().isEmpty()) {
             text.append("\n");
         }
-        text.append(bold(tile.title())).append("\n");
-        text.append("Pick the option that fits the solution best.");
+        text.append(tileQuestion(t, game, tile));
 
         String prefix = Callbacks.game(Callbacks.HINT, chatId, game.getCurrentHintIndex()) + Callbacks.SEPARATOR;
-        return Screen.text(text.toString(), CardKeyboardFactory.createTextKeyboard(tile.options(), prefix));
+        return t.text(text.toString(), CardKeyboardFactory.createOptionKeyboard(t, tile.options(), prefix));
     }
 
-    public static Screen tilesPlaced(Game game) {
+    public static Screen tilesPlaced(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
-        text.append(Theme.ICON_OK).append(" ").append(bold("ROUND " + game.getRound() + " REPORT IS OUT"))
+        text.append(Theme.ICON_OK).append(" ").append(bold(t.get("placed.title", game.getRound())))
                 .append("\n\n");
-        text.append(hintLines(game.getHints())).append("\n");
-        text.append(note(game.isLastRound()
-                ? "This is the final round. When the discussion is over, close the case."
-                : "Let the group discuss. Then start the next round and replace one tile."));
+        text.append(hintLines(t, game.getHints())).append("\n");
+        text.append(note(t.get(game.isLastRound() ? "placed.final" : "placed.next")));
 
-        return Screen.text(text.toString(), Keyboard.create()
-                .row(nextRoundButton(game, chatId))
+        return t.text(text.toString(), Keyboard.create()
+                .row(nextRoundButton(t, game, chatId))
                 .build());
     }
 
-    public static Screen chooseTileToReplace(Game game, HintTile newTile) {
+    /** Start of a new round: the Forensic Scientist picks one of the offered tiles. */
+    public static Screen chooseNewTile(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
-        text.append(Theme.ICON_ROUND).append(" ").append(bold("ROUND " + game.getRound() + " OF " + Game.MAX_ROUNDS))
-                .append("\n").append(italic("Replace one scene tile")).append("\n\n");
-        text.append("New tile: ").append(bold(newTile.title())).append("\n\n");
-        text.append("Which answer do you take off the board? ")
-                .append(italic("Cause of death and Location always stay."));
+        text.append(Theme.ICON_ROUND).append(" ")
+                .append(bold(t.get("round.title", game.getRound(), Game.MAX_ROUNDS)))
+                .append("\n").append(italic(t.get("newtile.sub"))).append("\n\n");
+        text.append(hintLines(t, game.getHints())).append("\n");
+        text.append(t.get("newtile.ask")).append(" ").append(italic(t.get("newtile.tip")));
+
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<HintTile> offered = game.getOfferedTiles();
+        for (int i = 0; i < offered.size(); i++) {
+            buttons.add(button(subjectIcon(offered.get(i).subject()) + " " + t.tile(offered.get(i).title()),
+                    Callbacks.game(Callbacks.OFFERED_TILE, chatId, game.getRound(), i)));
+        }
+        return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
+    }
+
+    public static Screen chooseTileToReplace(Texts t, Game game, HintTile newTile) {
+        long chatId = game.getRoom().groupChatId();
+        StringBuilder text = new StringBuilder();
+        text.append(Theme.ICON_ROUND).append(" ")
+                .append(bold(t.get("round.title", game.getRound(), Game.MAX_ROUNDS)))
+                .append("\n").append(italic(t.get("replace.sub"))).append("\n\n");
+        text.append(t.get("replace.new", subjectIcon(newTile.subject()) + " " + bold(t.tile(newTile.title()))))
+                .append("\n\n");
+        text.append(t.get("replace.ask")).append(" ").append(italic(t.get("replace.fixed")));
 
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         List<Hint> hints = game.getHints();
         for (int i = Game.FIXED_TILES; i < hints.size(); i++) {
-            buttons.add(button(hints.get(i).title() + ": " + hints.get(i).choice(),
+            buttons.add(button(subjectIcon(hints.get(i).subject()) + " " + t.tile(hints.get(i).title())
+                            + ": " + t.option(hints.get(i).choice()),
                     Callbacks.game(Callbacks.REPLACE_SLOT, chatId, game.getRound(), i)));
         }
-        return Screen.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
+        return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
     }
 
-    public static Screen replacementTile(Game game, HintTile tile) {
+    public static Screen replacementTile(Texts t, Game game, HintTile tile) {
         long chatId = game.getRoom().groupChatId();
-        String text = Theme.ICON_SCIENTIST + " " + bold("NEW SCENE TILE") + "\n\n"
-                + bold(tile.title()) + "\n"
-                + "Pick the option that fits the solution best.";
+        String text = Theme.ICON_SCIENTIST + " " + bold(t.get("newtile.title")) + "\n\n"
+                + tileQuestion(t, game, tile);
         String prefix = Callbacks.game(Callbacks.REPLACEMENT_HINT, chatId, game.getRound()) + Callbacks.SEPARATOR;
-        return Screen.text(text, CardKeyboardFactory.createTextKeyboard(tile.options(), prefix));
+        return t.text(text, CardKeyboardFactory.createOptionKeyboard(t, tile.options(), prefix));
+    }
+
+    public static Screen caseClosedByScientist(Texts t) {
+        return t.text(Theme.ICON_OK + " " + t.get("placed.closed"));
     }
 
     // ---------------------------------------------------------------- Investigation (group)
 
-    public static Screen tileAnswered(Game game, Hint hint) {
-        return Screen.text(Theme.ICON_SCIENTIST + " Scene tile " + game.getHints().size() + "\n"
-                + esc(hint.title()) + ": " + bold(hint.choice()));
+    public static Screen tileAnswered(Texts t, Game game, Hint hint) {
+        return t.text(Theme.ICON_SCIENTIST + " " + t.get("report.tile_answered", game.getHints().size(), game.getTileCount())
+                + "\n" + hintLine(t, hint));
     }
 
-    public static Screen roundStarted(Game game) {
-        return Screen.text(Theme.ICON_ROUND + " " + bold("ROUND " + game.getRound() + " OF " + Game.MAX_ROUNDS) + "\n"
-                + "The Forensic Scientist replaces one scene tile with a new one.");
+    public static Screen roundStarted(Texts t, Game game) {
+        return t.text(Theme.ICON_ROUND + " " + bold(t.get("round.title", game.getRound(), Game.MAX_ROUNDS)) + "\n"
+                + t.get("round.body"));
     }
 
-    public static Screen sceneReport(Game game) {
+    public static Screen sceneReport(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_SCIENTIST, "SCENE REPORT",
-                "Case " + game.getRoom().code() + ", round " + game.getRound() + " of " + Game.MAX_ROUNDS))
+        text.append(heading(Theme.ICON_SCIENTIST, t.get("report.title"),
+                t.get("report.sub", game.getRoom().code(), game.getRound(), Game.MAX_ROUNDS)))
                 .append("\n\n");
-        text.append(hintLines(game.getHints())).append("\n");
+        text.append(hintLines(t, game.getHints())).append("\n");
+        if (!game.getLabResults().isEmpty()) {
+            text.append(bold(t.get("report.lab"))).append("\n")
+                    .append(labLines(t, game.getLabResults())).append("\n");
+        }
         text.append(note(game.isLastRound()
-                ? "Final round. Solve the crime now, or the murderer escapes when the "
-                        + "Forensic Scientist closes the case."
-                : "Discuss what the answers point to. Each investigator has one attempt to solve the crime."));
+                ? t.get("report.final")
+                : Theme.ICON_LAB + " " + t.get("report.lab_open") + "\n"
+                        + Theme.ICON_HERRING + " " + t.get("report.herring")));
 
-        return Screen.text(text.toString(), Keyboard.create()
-                .row(button(Theme.ICON_ACCUSE + " Solve the Crime", Callbacks.game(Callbacks.ACCUSE_START, chatId)))
-                .row(button(Theme.ICON_ROOMS + " Evidence Board", Callbacks.game(Callbacks.EVIDENCE_BOARD, chatId)),
-                        nextRoundButton(game, chatId))
+        return t.text(text.toString(), Keyboard.create()
+                .row(button(Theme.ICON_LAB + " " + t.get("btn.lab_test"), Callbacks.game(Callbacks.LAB_START, chatId)),
+                        button(Theme.ICON_ACCUSE + " " + t.get("btn.solve"),
+                                Callbacks.game(Callbacks.ACCUSE_START, chatId)))
+                .row(button(Theme.ICON_ROOMS + " " + t.get("btn.evidence_board"),
+                                Callbacks.game(Callbacks.EVIDENCE_BOARD, chatId)),
+                        nextRoundButton(t, game, chatId))
                 .build());
     }
 
-    private static InlineKeyboardButton nextRoundButton(Game game, long chatId) {
-        return button(game.isLastRound() ? "⏹ Close the Case" : "⏭ Next Round",
+    private static InlineKeyboardButton nextRoundButton(Texts t, Game game, long chatId) {
+        return button(game.isLastRound() ? "⏹ " + t.get("btn.close_case") : "⏭ " + t.get("btn.next_round"),
                 Callbacks.game(Callbacks.NEXT_ROUND, chatId));
     }
 
-    private static String hintLines(List<Hint> hints) {
+    /** Every answer starts with the icon of the card type it describes. */
+    private static String hintLines(Texts t, List<Hint> hints) {
         StringBuilder lines = new StringBuilder();
         for (Hint hint : hints) {
-            lines.append("▪️ ").append(esc(hint.title())).append(": ").append(bold(hint.choice())).append("\n");
+            lines.append(hintLine(t, hint)).append("\n");
         }
         return lines.toString();
     }
 
+    private static String hintLine(Texts t, Hint hint) {
+        return subjectIcon(hint.subject()) + " " + esc(t.tile(hint.title())) + ": " + bold(t.option(hint.choice()));
+    }
+
+    private static String subjectIcon(TileSubject subject) {
+        return subject == TileSubject.MEANS ? Theme.ICON_MEANS : Theme.ICON_CLUE;
+    }
+
+    private static String cardIcon(Card card) {
+        return card.type() == CardType.WEAPON ? Theme.ICON_MEANS : Theme.ICON_CLUE;
+    }
+
+    private static String tileQuestion(Texts t, Game game, HintTile tile) {
+        boolean aboutMeans = tile.subject() == TileSubject.MEANS;
+        return subjectIcon(tile.subject()) + " " + bold(t.tile(tile.title())) + "\n"
+                + (aboutMeans
+                ? t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())))
+                : t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())))) + "\n"
+                + t.get("tile.pick");
+    }
+
+    private static String labLines(Texts t, List<LabResult> results) {
+        StringBuilder lines = new StringBuilder();
+        for (LabResult result : results) {
+            String card = result.trace()
+                    ? Theme.ICON_TRACE + " " + bold(t.card(result.card()))
+                    : Theme.ICON_CLEAN + " " + Theme.struck(t.card(result.card()));
+            lines.append(t.get("lab.line", card, esc(name(t, result.owner())), result.round(),
+                    esc(name(t, result.tester())))).append("\n");
+        }
+        return lines.toString();
+    }
+
+    // ---------------------------------------------------------------- Forensic lab (group)
+
+    public static Screen labChooseSuspect(Texts t, Game game, Player tester) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_LAB + " " + t.get("lab.who.title", bold(name(t, tester))) + "\n"
+                + italic(t.get("lab.step", game.getRound(), 1, 2)) + "\n\n"
+                + t.get("lab.who.ask");
+
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Player> suspects = game.getSuspects();
+        for (int i = 0; i < suspects.size(); i++) {
+            buttons.add(button(name(t, suspects.get(i)),
+                    Callbacks.game(Callbacks.LAB_SUSPECT, chatId, tester.userId(), i)));
+        }
+        return t.text(text, Keyboard.create()
+                .grid(buttons, CardKeyboardFactory.COLUMNS)
+                .row(button(t.get("btn.cancel"), Callbacks.game(Callbacks.LAB_CANCEL, chatId, tester.userId())))
+                .build());
+    }
+
+    /** All eight cards of one suspect. Cards the lab already knows show their result. */
+    public static Screen labChooseCard(Texts t, Game game, Player tester, int suspectIndex) {
+        long chatId = game.getRoom().groupChatId();
+        Player owner = game.getSuspects().get(suspectIndex);
+        Hand hand = game.getHands().get(owner);
+        String text = Theme.ICON_LAB + " "
+                + t.get("lab.card.title", bold(name(t, tester)), bold(name(t, owner))) + "\n"
+                + italic(t.get("lab.step", game.getRound(), 2, 2)) + "\n\n"
+                + t.get("lab.card.ask");
+
+        List<Card> cards = new ArrayList<>(hand.weapons());
+        cards.addAll(hand.evidence());
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        for (int i = 0; i < cards.size(); i++) {
+            Card card = cards.get(i);
+            String mark = game.findLabResult(card)
+                    .map(result -> result.trace() ? " " + Theme.ICON_TRACE : " ✓")
+                    .orElse("");
+            buttons.add(button(cardIcon(card) + " " + t.card(card) + mark,
+                    Callbacks.game(Callbacks.LAB_CARD, chatId, tester.userId(), suspectIndex, i)));
+        }
+        return t.text(text, Keyboard.create()
+                .grid(buttons, CardKeyboardFactory.COLUMNS)
+                .row(button(t.get("btn.cancel"), Callbacks.game(Callbacks.LAB_CANCEL, chatId, tester.userId())))
+                .build());
+    }
+
+    public static Screen labResult(Texts t, Game game, LabResult result) {
+        String finding = result.trace()
+                ? Theme.ICON_TRACE + " " + bold(t.get("lab.trace")) + "\n" + t.get("lab.trace.body")
+                : Theme.ICON_CLEAN + " " + bold(t.get("lab.clean")) + "\n" + t.get("lab.clean.body");
+        return t.text(Theme.ICON_LAB + " " + bold(t.get("lab.result.title"))
+                + italic("  " + t.get("lab.result.round", result.round())) + "\n"
+                + t.get("lab.result.tested", esc(name(t, result.tester())),
+                        cardIcon(result.card()) + " " + bold(t.card(result.card())),
+                        bold(name(t, result.owner()))) + "\n\n"
+                + finding + "\n\n"
+                + italic(t.get("lab.used", game.getTestsUsedThisRound(), game.getTestsPerRound())));
+    }
+
+    public static Screen labCancelled(Texts t, Player tester) {
+        return t.text(Theme.ICON_LAB + " " + t.get("lab.cancelled", esc(name(t, tester))));
+    }
+
     // ---------------------------------------------------------------- Accusation (group)
 
-    public static Screen accuseChooseSuspect(Game game, Player accuser) {
+    public static Screen accuseChooseSuspect(Texts t, Game game, Player accuser) {
         long chatId = game.getRoom().groupChatId();
-        String text = Theme.ICON_ACCUSE + " " + bold(name(accuser)) + " steps forward to solve the crime.\n"
-                + italic("Step 1 of 3") + "\n\n"
-                + "Who is the murderer?";
+        String text = Theme.ICON_ACCUSE + " " + t.get("accuse.who.title", bold(name(t, accuser))) + "\n"
+                + italic(t.get("common.step", 1, 3)) + "\n\n"
+                + t.get("accuse.who.ask");
 
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         List<Player> suspects = game.getSuspects();
         for (int i = 0; i < suspects.size(); i++) {
             if (suspects.get(i).userId() != accuser.userId()) {
-                buttons.add(button(name(suspects.get(i)),
+                buttons.add(button(name(t, suspects.get(i)),
                         Callbacks.game(Callbacks.ACCUSE_SUSPECT, chatId, accuser.userId(), i)));
             }
         }
-        return Screen.text(text, Keyboard.create()
+        return t.text(text, Keyboard.create()
                 .grid(buttons, CardKeyboardFactory.COLUMNS)
-                .row(cancelButton(chatId, accuser))
+                .row(cancelButton(t, chatId, accuser))
                 .build());
     }
 
-    public static Screen accuseChooseMeans(Game game, Player accuser, int suspectIndex) {
+    public static Screen accuseChooseMeans(Texts t, Game game, Player accuser, int suspectIndex) {
         long chatId = game.getRoom().groupChatId();
         Player suspect = game.getSuspects().get(suspectIndex);
-        String text = Theme.ICON_ACCUSE + " " + bold(name(accuser)) + " accuses " + bold(name(suspect)) + ".\n"
-                + italic("Step 2 of 3") + "\n\n"
-                + Theme.ICON_MEANS + " What was the Means of Murder?";
+        String text = Theme.ICON_ACCUSE + " "
+                + t.get("accuse.line", bold(name(t, accuser)), bold(name(t, suspect))) + "\n"
+                + italic(t.get("common.step", 2, 3)) + "\n\n"
+                + Theme.ICON_MEANS + " " + t.get("accuse.means.ask");
         String prefix = Callbacks.game(Callbacks.ACCUSE_WEAPON, chatId, accuser.userId(), suspectIndex)
                 + Callbacks.SEPARATOR;
-        return Screen.text(text, Keyboard.create()
-                .grid(CardKeyboardFactory.cardButtons(game.getHands().get(suspect).weapons(), prefix),
+        return t.text(text, Keyboard.create()
+                .grid(CardKeyboardFactory.cardButtons(t, game.getHands().get(suspect).weapons(), prefix),
                         CardKeyboardFactory.COLUMNS)
-                .row(cancelButton(chatId, accuser))
+                .row(cancelButton(t, chatId, accuser))
                 .build());
     }
 
-    public static Screen accuseChooseKeyEvidence(Game game, Player accuser, int suspectIndex, int weaponIndex) {
+    public static Screen accuseChooseKeyEvidence(Texts t, Game game, Player accuser, int suspectIndex,
+                                                 int weaponIndex) {
         long chatId = game.getRoom().groupChatId();
         Player suspect = game.getSuspects().get(suspectIndex);
         Hand hand = game.getHands().get(suspect);
-        String text = Theme.ICON_ACCUSE + " " + bold(name(accuser)) + " accuses " + bold(name(suspect)) + ".\n"
-                + italic("Step 3 of 3") + "\n\n"
-                + Theme.ICON_MEANS + " Means of Murder: " + bold(hand.weapons().get(weaponIndex).name()) + "\n"
-                + Theme.ICON_CLUE + " What is the Key Evidence?";
+        String text = Theme.ICON_ACCUSE + " "
+                + t.get("accuse.line", bold(name(t, accuser)), bold(name(t, suspect))) + "\n"
+                + italic(t.get("common.step", 3, 3)) + "\n\n"
+                + Theme.ICON_MEANS + " " + t.get("term.means_label", bold(t.card(hand.weapons().get(weaponIndex))))
+                + "\n"
+                + Theme.ICON_CLUE + " " + t.get("accuse.clue.ask");
         String prefix = Callbacks.game(Callbacks.ACCUSE_EVIDENCE, chatId, accuser.userId(), suspectIndex, weaponIndex)
                 + Callbacks.SEPARATOR;
-        return Screen.text(text, Keyboard.create()
-                .grid(CardKeyboardFactory.cardButtons(hand.evidence(), prefix), CardKeyboardFactory.COLUMNS)
-                .row(cancelButton(chatId, accuser))
+        return t.text(text, Keyboard.create()
+                .grid(CardKeyboardFactory.cardButtons(t, hand.evidence(), prefix), CardKeyboardFactory.COLUMNS)
+                .row(cancelButton(t, chatId, accuser))
                 .build());
     }
 
-    private static InlineKeyboardButton cancelButton(long chatId, Player accuser) {
-        return button("Cancel", Callbacks.game(Callbacks.ACCUSE_CANCEL, chatId, accuser.userId()));
+    private static InlineKeyboardButton cancelButton(Texts t, long chatId, Player accuser) {
+        return button(t.get("btn.cancel"), Callbacks.game(Callbacks.ACCUSE_CANCEL, chatId, accuser.userId()));
     }
 
-    public static Screen accusationWithdrawn(Player accuser) {
-        return Screen.text(Theme.ICON_ACCUSE + " " + esc(name(accuser))
-                + " stepped back. The attempt is still available.");
+    public static Screen accusationWithdrawn(Texts t, Player accuser) {
+        return t.text(Theme.ICON_ACCUSE + " " + t.get("accuse.withdrawn", esc(name(t, accuser))));
     }
 
-    private static String accusationLine(Player accuser, Player suspect, Card weapon, Card evidence) {
-        return Theme.ICON_ACCUSE + " " + bold(name(accuser)) + " accuses " + bold(name(suspect)) + "\n"
-                + Theme.ICON_MEANS + " " + esc(weapon.name()) + "   "
-                + Theme.ICON_CLUE + " " + esc(evidence.name());
+    private static String accusationLine(Texts t, Player accuser, Player suspect, Card weapon, Card evidence) {
+        return Theme.ICON_ACCUSE + " "
+                + t.get("accuse.summary", bold(name(t, accuser)), bold(name(t, suspect))) + "\n"
+                + Theme.ICON_MEANS + " " + esc(t.card(weapon)) + "   "
+                + Theme.ICON_CLUE + " " + esc(t.card(evidence));
     }
 
-    public static Screen accusationWrong(Player accuser, Player suspect, Card weapon, Card evidence) {
-        return Screen.text(accusationLine(accuser, suspect, weapon, evidence) + "\n\n"
-                + Theme.ICON_WRONG + " " + bold("No.") + " The Forensic Scientist shakes their head.\n"
-                + esc(name(accuser)) + " has used their attempt. The investigation continues.");
+    public static Screen accusationWrong(Texts t, Player accuser, Player suspect, Card weapon, Card evidence) {
+        return t.text(accusationLine(t, accuser, suspect, weapon, evidence) + "\n\n"
+                + Theme.ICON_WRONG + " " + t.get("accuse.wrong") + "\n"
+                + t.get("accuse.wrong.used", esc(name(t, accuser))));
     }
 
-    public static Screen accusationFinal(Player accuser, Player suspect, Card weapon, Card evidence,
+    public static Screen accusationFinal(Texts t, Player accuser, Player suspect, Card weapon, Card evidence,
                                          boolean correct) {
-        return Screen.text(accusationLine(accuser, suspect, weapon, evidence) + "\n\n"
+        return t.text(accusationLine(t, accuser, suspect, weapon, evidence) + "\n\n"
                 + (correct
-                ? Theme.ICON_OK + " " + bold("Yes.") + " The Forensic Scientist nods."
-                : Theme.ICON_WRONG + " " + bold("No.") + " That was the last attempt."));
+                ? Theme.ICON_OK + " " + t.get("accuse.right")
+                : Theme.ICON_WRONG + " " + t.get("accuse.last")));
+    }
+
+    public static Screen accusationOfScapegoat(Texts t, Player accuser, Player suspect, Card weapon,
+                                               Card evidence) {
+        return t.text(accusationLine(t, accuser, suspect, weapon, evidence) + "\n\n"
+                + Theme.ICON_HERRING + " " + t.get("accuse.herring"));
     }
 
     // ---------------------------------------------------------------- Verdict (group)
 
-    public static Screen caseSolved(Game game, Player solver) {
-        String text = Theme.ICON_OK + " " + bold("CASE " + game.getRoom().code() + " SOLVED") + "\n"
-                + italic("The investigators and the Forensic Scientist win") + "\n\n"
-                + esc(name(solver)) + " named the murderer and both cards.\n\n"
-                + solution(game) + "\n\n"
-                + roleReveal(game)
-                + practiceNote(game);
-        return Screen.withBanner(Banner.CASE_SOLVED, text, afterCaseKeyboard());
+    public static Screen caseSolved(Texts t, Game game, Player solver) {
+        String text = Theme.ICON_OK + " " + bold(t.get("verdict.solved.title", game.getRoom().code())) + "\n"
+                + italic(t.get("verdict.solved.sub")) + "\n\n"
+                + t.get("verdict.solved.by", esc(name(t, solver))) + "\n\n"
+                + solution(t, game) + "\n\n"
+                + roleReveal(t, game)
+                + practiceNote(t, game);
+        return t.banner(Banner.CASE_SOLVED, text, afterCaseKeyboard(t));
     }
 
-    public static Screen murdererEscaped(Game game, String reason) {
-        String text = Theme.ICON_MEANS + " " + bold("CASE " + game.getRoom().code() + " UNSOLVED") + "\n"
-                + italic("The murderer wins") + "\n\n"
-                + esc(reason) + "\n\n"
-                + solution(game) + "\n\n"
-                + roleReveal(game)
-                + practiceNote(game);
-        return Screen.withBanner(Banner.CASE_COLD, text, afterCaseKeyboard());
+    /** @param reason why the case stays unsolved; names in it must not be escaped yet */
+    public static Screen murdererEscaped(Texts t, Game game, Msg reason) {
+        String text = Theme.ICON_MEANS + " " + bold(t.get("verdict.cold.title", game.getRoom().code())) + "\n"
+                + italic(t.get("verdict.cold.sub")) + "\n\n"
+                + esc(t.get(reason)) + "\n\n"
+                + solution(t, game) + "\n\n"
+                + roleReveal(t, game)
+                + practiceNote(t, game);
+        return t.banner(Banner.CASE_COLD, text, afterCaseKeyboard(t));
     }
 
-    public static Screen caseAbandoned(Game game, String closedBy) {
-        return Screen.text(Theme.ICON_ROOMS + " " + bold("CASE " + game.getRoom().code() + " CLOSED") + "\n\n"
-                + esc(closedBy) + " ended the case before it was solved. Nothing is counted.",
-                afterCaseKeyboard());
+    public static Screen caseAbandoned(Texts t, Game game, String closedBy) {
+        return t.text(Theme.ICON_ROOMS + " " + bold(t.get("verdict.abandoned.title", game.getRoom().code()))
+                        + "\n\n" + t.get("verdict.abandoned.body", t.name(closedBy, NAME_LENGTH)),
+                afterCaseKeyboard(t));
     }
 
-    private static InlineKeyboardMarkup afterCaseKeyboard() {
+    private static InlineKeyboardMarkup afterCaseKeyboard(Texts t) {
         return Keyboard.create()
-                .row(button(Theme.ICON_CREATE + " New Case in This Group", Callbacks.newRoomHere()))
+                .row(button(Theme.ICON_CREATE + " " + t.get("btn.new_case"), Callbacks.newRoomHere()))
                 .build();
     }
 
-    private static String solution(Game game) {
-        return note("Murderer: " + bold(name(game.getMurderer())) + "\n"
-                + Theme.ICON_MEANS + " Means of Murder: " + bold(game.getMurderWeapon().name()) + "\n"
-                + Theme.ICON_CLUE + " Key Evidence: " + bold(game.getKeyEvidence().name()));
+    private static String solution(Texts t, Game game) {
+        return note(t.get("term.murderer_label", bold(name(t, game.getMurderer()))) + "\n"
+                + Theme.ICON_MEANS + " " + t.get("term.means_label", bold(t.card(game.getMurderWeapon()))) + "\n"
+                + Theme.ICON_CLUE + " " + t.get("term.evidence_label", bold(t.card(game.getKeyEvidence()))) + "\n"
+                + Theme.ICON_HERRING + " " + t.get("verdict.herring", bold(name(t, game.getScapegoat())),
+                        esc(t.card(game.getPlantedMeans())), esc(t.card(game.getPlantedClue()))));
     }
 
-    private static String roleReveal(Game game) {
+    private static String roleReveal(Texts t, Game game) {
         String investigators = game.getRoles().entrySet().stream()
                 .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
-                .map(entry -> esc(name(entry.getKey())))
-                .collect(Collectors.joining(", "));
-        return Theme.ICON_SCIENTIST + " Forensic Scientist: " + esc(name(game.getForensicScientist())) + "\n"
-                + Theme.ICON_CLUE + " Investigators: " + investigators;
+                .map(entry -> esc(name(t, entry.getKey())))
+                .collect(Collectors.joining(t.get("common.list_separator")));
+        return Theme.ICON_SCIENTIST + " "
+                + t.get("verdict.scientist", esc(name(t, game.getForensicScientist()))) + "\n"
+                + Theme.ICON_CLUE + " " + t.get("verdict.investigators", investigators);
     }
 
-    private static String practiceNote(Game game) {
-        return game.isPractice() ? "\n\n" + italic(PRACTICE_NOTE) : "";
+    private static String practiceNote(Texts t, Game game) {
+        return game.isPractice() ? "\n\n" + italic(t.get("case.practice")) : "";
     }
 
     // ---------------------------------------------------------------- Case file (private, "Rejoin Game")
 
     /** Everything one player may know about their running case, for the private chat. */
-    public static Screen caseFile(Game game, long viewerId) {
+    public static Screen caseFile(Texts t, Game game, long viewerId) {
         Role role = game.getRole(viewerId).orElseThrow();
 
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_ROOMS, "CASE FILE " + game.getRoom().code(),
-                shorten(game.getRoom().groupTitle(), TITLE_LENGTH))).append("\n\n");
-        text.append(Theme.ICON_LIVE).append(" Round ").append(game.getRound()).append(" of ")
-                .append(Game.MAX_ROUNDS).append("\n");
-        text.append(Theme.ICON_SECRET).append(" Your role: ").append(bold(role.getTitle())).append("\n");
+        text.append(heading(Theme.ICON_ROOMS, t.get("file.title", game.getRoom().code()),
+                t.plainName(game.getRoom().groupTitle(), TITLE_LENGTH))).append("\n\n");
+        text.append(Theme.ICON_LIVE).append(" ").append(t.get("case.round", game.getRound(), Game.MAX_ROUNDS))
+                .append("\n");
+        text.append(Theme.ICON_SECRET).append(" ").append(t.get("file.role", bold(t.role(role)))).append("\n");
 
         if (role != Role.INVESTIGATOR && game.hasSolution()) {
-            text.append(Theme.ICON_MEANS).append(" ").append(bold(game.getMurderWeapon().name()))
-                    .append("   ").append(Theme.ICON_CLUE).append(" ").append(bold(game.getKeyEvidence().name()))
+            text.append(Theme.ICON_MEANS).append(" ").append(bold(t.card(game.getMurderWeapon())))
+                    .append("   ").append(Theme.ICON_CLUE).append(" ").append(bold(t.card(game.getKeyEvidence())))
                     .append("\n");
         }
+        if (role == Role.MURDERER && game.isCrimeSealed()) {
+            text.append(Theme.ICON_HERRING).append(" ").append(t.get("file.planted",
+                    esc(name(t, game.getScapegoat())), esc(t.card(game.getPlantedMeans())),
+                    esc(t.card(game.getPlantedClue())))).append("\n");
+        }
         if (role != Role.FORENSIC_SCIENTIST) {
-            text.append(Theme.ICON_ACCUSE).append(game.hasAccused(viewerId)
-                    ? " Your attempt to solve the crime is used."
-                    : " Your attempt to solve the crime is still available.").append("\n");
+            text.append(Theme.ICON_ACCUSE).append(" ")
+                    .append(t.get(game.hasAccused(viewerId) ? "file.attempt.used" : "file.attempt.open"))
+                    .append("\n");
+            text.append(Theme.ICON_LAB).append(" ")
+                    .append(t.get(game.canTest(viewerId) ? "file.lab.yes" : "file.lab.no"))
+                    .append("\n");
         }
 
-        text.append("\n").append(bold("Scene report")).append("\n");
+        text.append("\n").append(bold(t.get("file.report"))).append("\n");
         text.append(game.getHints().isEmpty()
-                ? italic("No scene tiles answered yet.") + "\n"
-                : hintLines(game.getHints()));
+                ? italic(t.get("file.no_tiles")) + "\n"
+                : hintLines(t, game.getHints()));
 
-        text.append("\n").append(bold("Evidence board")).append("\n");
+        text.append("\n").append(bold(t.get("file.board"))).append("\n");
         for (Map.Entry<Player, Hand> entry : game.getHands().entrySet()) {
-            text.append(esc(name(entry.getKey())));
+            text.append(esc(name(t, entry.getKey())));
             if (entry.getKey().userId() == viewerId) {
-                text.append(" ").append(italic("you"));
+                text.append(" ").append(italic(t.get("file.you")));
             }
             text.append("\n")
-                    .append(Theme.ICON_MEANS).append(" ").append(cardNames(entry.getValue().weapons())).append("\n")
-                    .append(Theme.ICON_CLUE).append(" ").append(cardNames(entry.getValue().evidence())).append("\n");
+                    .append(Theme.ICON_MEANS).append(" ").append(cardNames(t, game, entry.getValue().weapons()))
+                    .append("\n")
+                    .append(Theme.ICON_CLUE).append(" ").append(cardNames(t, game, entry.getValue().evidence()))
+                    .append("\n");
         }
-        text.append("\n").append(italic("The case continues in the group chat."));
+        text.append("\n").append(italic(t.get("file.continues")));
 
-        return Screen.text(text.toString(), Keyboard.create()
-                .row(button("↻ Refresh", Callbacks.caseFile(game.getRoom().code())))
-                .row(button(Theme.ICON_HOME + " Home", Callbacks.HOME),
-                        button(Theme.ICON_ROOMS + " Rooms", Callbacks.ROOMS))
+        return t.text(text.toString(), Keyboard.create()
+                .row(button("↻ " + t.get("btn.refresh"), Callbacks.caseFile(game.getRoom().code())))
+                .row(button(Theme.ICON_HOME + " " + t.get("nav.home"), Callbacks.HOME),
+                        button(Theme.ICON_ROOMS + " " + t.get("nav.rooms"), Callbacks.ROOMS))
                 .build());
     }
 
-    private static String name(Player player) {
-        return shorten(player.name(), NAME_LENGTH);
+    /** A player's name, shortened but not escaped: wrap it in bold(), italic() or esc(). */
+    private static String name(Texts t, Player player) {
+        return t.plainName(player.name(), NAME_LENGTH);
     }
 }

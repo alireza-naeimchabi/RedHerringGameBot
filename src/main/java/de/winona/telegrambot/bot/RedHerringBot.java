@@ -1,12 +1,13 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.model.Role;
 import de.winona.telegrambot.service.GameService;
+import de.winona.telegrambot.service.LanguageService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
 import de.winona.telegrambot.ui.Callbacks;
-import de.winona.telegrambot.ui.Keyboard;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.ui.GameScreens;
 import de.winona.telegrambot.ui.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,24 +31,31 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     private static final Logger log = LoggerFactory.getLogger(RedHerringBot.class);
 
     private final Messenger messenger;
+    private final Localizer localizer;
     private final MenuController menuController;
     private final RoomController roomController;
     private final GameController gameController;
 
     public RedHerringBot(String botToken) {
-        this(new OkHttpTelegramClient(botToken), new StatsService());
+        this(new OkHttpTelegramClient(botToken), new StatsService(), new LanguageService());
         messenger.registerCommands();
     }
 
-    /** Lets tests plug in their own Telegram client and statistics file. */
+    /** For tests: their own Telegram client and statistics file, language choices kept in memory. */
     public RedHerringBot(TelegramClient telegramClient, StatsService statsService) {
+        this(telegramClient, statsService, LanguageService.inMemory());
+    }
+
+    public RedHerringBot(TelegramClient telegramClient, StatsService statsService,
+                         LanguageService languageService) {
         LobbyService lobbyService = new LobbyService();
         GameService gameService = new GameService();
 
         this.messenger = new Messenger(telegramClient);
-        this.gameController = new GameController(messenger, gameService, statsService);
-        this.roomController = new RoomController(messenger, lobbyService, gameService, gameController);
-        this.menuController = new MenuController(messenger, lobbyService, gameService, statsService,
+        this.localizer = new Localizer(languageService);
+        this.gameController = new GameController(messenger, localizer, gameService, statsService);
+        this.roomController = new RoomController(messenger, localizer, lobbyService, gameService, gameController);
+        this.menuController = new MenuController(messenger, localizer, lobbyService, gameService, statsService,
                 roomController, gameController);
     }
 
@@ -94,8 +102,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 
         if (privateChat) {
             if (!menuController.onCommand(command, argument, user)) {
-                messenger.send(message.getChatId(), Screen.text(Theme.ICON_ROOMS
-                        + " This command works in a group chat during a case. Send /start for the dashboard."));
+                messenger.send(message.getChatId(), localizer.forUser(user.getId(),
+                        t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("private.group_command"))));
             }
         } else if (message.getChat().isGroupChat() || message.getChat().isSuperGroupChat()) {
             handleGroupCommand(command, message, user);
@@ -112,15 +120,17 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
 
         switch (command) {
             case "/start", "/newgame" -> roomController.createRoom(chatId, message.getChat().getTitle(), user);
-            case "/room" -> roomController.showRoomCard(chatId);
+            case "/room" -> roomController.showRoomCard(chatId, user);
             case "/join" -> roomController.joinByCommand(chatId, user);
             case "/leave" -> roomController.leaveByCommand(chatId, user);
             case "/startgame" -> roomController.openCaseByCommand(chatId, user, null);
-            case "/board" -> gameController.showEvidenceBoard(chatId);
+            case "/board" -> gameController.showEvidenceBoard(chatId, user);
+            case "/lab" -> gameController.labTestByCommand(chatId, user);
             case "/accuse" -> gameController.accuseByCommand(chatId, user);
             case "/nextround" -> gameController.nextRoundByCommand(chatId, user);
             case "/endgame" -> endGame(chatId, user);
-            case "/help" -> messenger.send(chatId, groupHelp());
+            case "/help" -> messenger.send(chatId, localizer.forUser(user.getId(),
+                    t -> GameScreens.groupHelp(t, messenger.deepLink("how").orElse(null))));
 
             // Practice helpers for trying the bot alone
             case "/addtestplayers" -> roomController.addTestPlayers(chatId, user);
@@ -136,21 +146,9 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             return;
         }
         if (!gameController.abandonCase(chatId, user)) {
-            messenger.send(chatId, Screen.text(Theme.ICON_ROOMS + " There is nothing to end in this group."));
+            messenger.send(chatId, localizer.forUser(user.getId(),
+                    t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("group.nothing_to_end"))));
         }
-    }
-
-    private Screen groupHelp() {
-        String text = Theme.heading(Theme.ICON_HOW_TO, "HOW TO PLAY", "The short version") + "\n\n"
-                + "One of you is the murderer. The Forensic Scientist knows the solution and answers "
-                + "scene tiles. Everyone else has one attempt to name the murderer, "
-                + "the Means of Murder and the Key Evidence within 3 rounds.\n\n"
-                + "/newgame creates a room, /accuse solves the crime, /board shows the cards.";
-        return messenger.deepLink("how")
-                .map(url -> Screen.text(text, Keyboard.create()
-                        .row(Keyboard.link(Theme.ICON_HOW_TO + " Open the Full Guide", url))
-                        .build()))
-                .orElse(Screen.text(text));
     }
 
     // ---------------------------------------------------------------- Buttons
@@ -158,6 +156,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     private void handleCallback(CallbackQuery callback) {
         String data = callback.getData() == null ? "" : callback.getData();
         Click click = new Click(messenger, callback.getId(), callback.getFrom(),
+                localizer.textsFor(callback.getFrom().getId()),
                 messageOf(callback), chatTitleOf(callback), data.split(Callbacks.SEPARATOR));
         try {
             switch (click.part(0)) {
@@ -167,7 +166,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             }
         } catch (RuntimeException e) {
             log.warn("Could not handle button '{}'.", data, e);
-            click.alert("This button is no longer valid.");
+            click.alert("err.button_invalid");
         } finally {
             click.finish();
         }
