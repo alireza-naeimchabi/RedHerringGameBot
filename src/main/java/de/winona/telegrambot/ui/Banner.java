@@ -1,6 +1,12 @@
 package de.winona.telegrambot.ui;
 
-/** The artwork shown above a screen. Files live in src/main/resources/ui. */
+import de.winona.telegrambot.i18n.Language;
+
+/**
+ * The artwork shown above a screen. The words on a banner are part of the picture,
+ * so every language has its own set: src/main/resources/ui for the default language
+ * and src/main/resources/ui/&lt;code&gt; for the others.
+ */
 public enum Banner {
     HOME("home"),
     ROOMS("rooms"),
@@ -21,7 +27,10 @@ public enum Banner {
         return fileName;
     }
 
-    public String resourcePath() {
-        return "/ui/" + fileName;
+    public String resourcePath(Language language) {
+        if (language == null || language == Language.DEFAULT) {
+            return "/ui/" + fileName;
+        }
+        return "/ui/" + language.code() + "/" + fileName;
     }
 }

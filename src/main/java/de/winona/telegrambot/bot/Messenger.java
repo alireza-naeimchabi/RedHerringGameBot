@@ -1,5 +1,6 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.ui.Banner;
 import de.winona.telegrambot.ui.Screen;
 import org.slf4j.Logger;
@@ -194,9 +195,9 @@ public class Messenger {
         if (uploadedBanners.containsKey(banner)) {
             return InputStream.nullInputStream();
         }
-        InputStream image = Messenger.class.getResourceAsStream(banner.resourcePath());
+        InputStream image = Messenger.class.getResourceAsStream(banner.resourcePath(Language.DEFAULT));
         if (image == null) {
-            log.warn("Banner image {} is missing. The screen is shown without artwork.", banner.resourcePath());
+            log.warn("Banner image {} is missing. The screen is shown without artwork.", banner.resourcePath(Language.DEFAULT));
         }
         return image;
     }
