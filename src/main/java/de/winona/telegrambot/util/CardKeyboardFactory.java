@@ -29,13 +29,6 @@ public class CardKeyboardFactory {
         return textButtons(cards.stream().map(Card::name).toList(), callbackPrefix);
     }
 
-    /** Still used by the old RedHerringBot until it is split into controllers. */
-    public static InlineKeyboardMarkup createKeyboard(java.util.Map<String, String> buttons) {
-        Keyboard keyboard = Keyboard.create();
-        buttons.forEach((text, data) -> keyboard.row(Keyboard.button(text, data)));
-        return keyboard.build();
-    }
-
     /** One button per text. The callback data is the prefix followed by the index of the text. */
     public static List<InlineKeyboardButton> textButtons(List<String> texts, String callbackPrefix) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
