@@ -318,7 +318,7 @@ class RedHerringBotTest {
         // Round 2: one tile is replaced.
         press(scientist, tile, tile.button("Next Round").orElseThrow().getCallbackData());
         assertTrue(tile.html.contains("ROUND 2 OF 3"));
-        assertEquals(4, tile.buttons().size(), "Cause of death and Location cannot be replaced");
+        assertEquals(5, tile.buttons().size(), "only Cause of death cannot be replaced");
         press(scientist, tile, tile.buttons().get(0).getCallbackData());
         assertTrue(tile.html.contains("NEW SCENE TILE"));
         press(scientist, tile, tile.buttons().get(3).getCallbackData());

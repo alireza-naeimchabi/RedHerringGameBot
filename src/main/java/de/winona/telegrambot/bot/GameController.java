@@ -1,5 +1,6 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.model.AccusationResult;
 import de.winona.telegrambot.model.Card;
 import de.winona.telegrambot.model.CardDeck;
 import de.winona.telegrambot.model.Game;
@@ -224,7 +225,9 @@ public class GameController {
             return Optional.empty();
         }
 
-        HintTile newTile = game.startNextRound();
+        game.startNextRound();
+        game.chooseOfferedTile(0);
+        HintTile newTile = game.getPendingTile();
         messenger.send(chatId, GameScreens.roundStarted(game));
 
         if (isTestPlayer(scientist)) {
@@ -386,7 +389,7 @@ public class GameController {
         Card weapon = hand.weapons().get(weaponIndex);
         Card evidence = hand.evidence().get(evidenceIndex);
 
-        boolean correct = game.accuse(accuser.userId(), suspect, weapon, evidence);
+        boolean correct = game.accuse(accuser.userId(), suspect, weapon, evidence) == AccusationResult.SOLVED;
 
         if (correct) {
             messenger.show(click.message(), GameScreens.accusationFinal(accuser, suspect, weapon, evidence, true));

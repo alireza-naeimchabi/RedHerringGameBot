@@ -1,30 +1,59 @@
 package de.winona.telegrambot.model;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
+/**
+ * The rules of one case.
+ *
+ * <p>On top of the board game this version adds two things that belong together:
+ * the murderer plants a <b>red herring</b> (two cards of an innocent player), and every round
+ * each suspect may send one card to the <b>forensic lab</b>. The lab finds a trace on the real
+ * cards and on the planted ones alike, so only the scene tiles tell the two trails apart.
+ */
 public class Game
 {
+
+    public static final int MAX_ROUNDS = 3;
+    /** Cause of death always stays on the board. */
+    public static final int FIXED_TILES = 1;
+    public static final int LAB_TESTS_PER_ROUND = 1;
 
     private final Room room;
     private final boolean practice;
     private final Map<Player, Role> roles = new LinkedHashMap<>();
     private final Map<Player, Hand> hands = new LinkedHashMap<>();
 
+    // The crime
     private Card murderWeapon;
     private Card keyEvidence;
 
+    // The red herring
+    private Player scapegoat;
+    private Card plantedMeans;
+    private Card plantedClue;
+
+    // Scene tiles
     private final HintDeck hintDeck = new HintDeck();
     private final List<HintTile> hintTiles = hintDeck.drawStartTiles();
     private final List<Hint> hints = new ArrayList<>();
 
-
-    public static final int MAX_ROUNDS = 3;
-    public static final int FIXED_TILES = 2; // Cause of death + Location bleiben immer
-
+    // Rounds
     private int round = 1;
+    private List<HintTile> offeredTiles = List.of();
     private HintTile pendingTile;
     private Integer pendingSlot;
 
+    // Lab and accusations
+    private final List<LabResult> labResults = new ArrayList<>();
+    private final Map<Long, Integer> testsInCurrentRound = new HashMap<>();
     private final Set<Long> usedAccusations = new HashSet<>();
 
     public Game(Room room, List<Player> players, Player forcedPlayer, Role forcedRole) {
@@ -65,6 +94,8 @@ public class Game
         };
     }
 
+    // ---------------------------------------------------------------- Players and roles
+
     public Room getRoom() {
         return room;
     }
@@ -98,7 +129,22 @@ public class Game
                 .orElseThrow();
     }
 
-    //Murderacts
+    /** Everyone who has cards: the murderer and the investigators. */
+    public List<Player> getSuspects() {
+        return new ArrayList<>(hands.keySet());
+    }
+
+    public Optional<Player> getPlayer(long userId) {
+        return roles.keySet().stream()
+                .filter(player -> player.userId() == userId)
+                .findFirst();
+    }
+
+    public Optional<Role> getRole(long userId) {
+        return getPlayer(userId).map(roles::get);
+    }
+
+    // ---------------------------------------------------------------- The crime
 
     public Hand getMurdererHand() {
         return hands.get(getMurderer());
@@ -116,6 +162,7 @@ public class Game
         return murderWeapon != null;
     }
 
+    /** True once the murderer has chosen the Means of Murder and the Key Evidence. */
     public boolean hasSolution() {
         return murderWeapon != null && keyEvidence != null;
     }
@@ -128,7 +175,57 @@ public class Game
         return keyEvidence;
     }
 
+    // ---------------------------------------------------------------- The red herring
 
+    /** The players the murderer can frame: every suspect except the murderer. */
+    public List<Player> getPossibleScapegoats() {
+        List<Player> others = getSuspects();
+        others.remove(getMurderer());
+        return others;
+    }
+
+    public void chooseScapegoat(int index) {
+        scapegoat = getPossibleScapegoats().get(index);
+    }
+
+    public boolean hasScapegoat() {
+        return scapegoat != null;
+    }
+
+    public Player getScapegoat() {
+        return scapegoat;
+    }
+
+    public Hand getScapegoatHand() {
+        return hands.get(scapegoat);
+    }
+
+    public void plantMeans(int index) {
+        plantedMeans = getScapegoatHand().weapons().get(index);
+    }
+
+    public void plantClue(int index) {
+        plantedClue = getScapegoatHand().evidence().get(index);
+    }
+
+    public boolean hasPlantedMeans() {
+        return plantedMeans != null;
+    }
+
+    public Card getPlantedMeans() {
+        return plantedMeans;
+    }
+
+    public Card getPlantedClue() {
+        return plantedClue;
+    }
+
+    /** True once the solution is chosen and the red herring is planted. Only then the case can move on. */
+    public boolean isCrimeSealed() {
+        return hasSolution() && scapegoat != null && plantedMeans != null && plantedClue != null;
+    }
+
+    // ---------------------------------------------------------------- Scene tiles
 
     public Optional<HintTile> getCurrentHintTile() {
         if (allHintsGiven()) {
@@ -143,7 +240,7 @@ public class Game
 
     public void addHint(int optionIndex) {
         HintTile tile = hintTiles.get(hints.size());
-        hints.add(new Hint(tile.title(), tile.options().get(optionIndex)));
+        hints.add(new Hint(tile.title(), tile.options().get(optionIndex), tile.subject()));
     }
 
     public int getTileCount() {
@@ -158,47 +255,7 @@ public class Game
         return Collections.unmodifiableList(hints);
     }
 
-
-    public List<Player> getSuspects() {
-        return new ArrayList<>(hands.keySet());
-    }
-
-    public Optional<Player> getPlayer(long userId) {
-        return roles.keySet().stream()
-                .filter(player -> player.userId() == userId)
-                .findFirst();
-    }
-
-    public Optional<Role> getRole(long userId) {
-        return getPlayer(userId).map(roles::get);
-    }
-
-    public boolean hasAccused(long userId) {
-        return usedAccusations.contains(userId);
-    }
-
-    public boolean canAccuse(long userId) {
-        Optional<Player> player = getPlayer(userId);
-        return player.isPresent()
-                && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
-                && hasSolution()
-                && !usedAccusations.contains(userId);
-    }
-
-    public boolean accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
-        usedAccusations.add(accuserId);
-        return suspect.equals(getMurderer())
-                && weapon.equals(murderWeapon)
-                && evidence.equals(keyEvidence);
-    }
-
-    public boolean allInvestigatorsDone() {
-        return roles.entrySet().stream()
-                .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
-                .map(Map.Entry::getKey)
-                .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
-                .allMatch(player -> usedAccusations.contains(player.userId()));
-    }
+    // ---------------------------------------------------------------- Rounds
 
     public int getRound() {
         return round;
@@ -208,15 +265,32 @@ public class Game
         return round >= MAX_ROUNDS;
     }
 
-    public HintTile startNextRound() {
+    /**
+     * Starts the next round. The Forensic Scientist gets new tiles to choose from
+     * and every suspect gets a fresh lab test.
+     */
+    public List<HintTile> startNextRound() {
         round++;
-        pendingTile = hintDeck.drawTile();
+        testsInCurrentRound.clear();
+        offeredTiles = hintDeck.drawOffer();
+        pendingTile = null;
         pendingSlot = null;
-        return pendingTile;
+        return offeredTiles;
     }
 
+    /** The tiles the Forensic Scientist may choose from. Empty once one is chosen. */
+    public List<HintTile> getOfferedTiles() {
+        return offeredTiles;
+    }
+
+    public void chooseOfferedTile(int index) {
+        pendingTile = offeredTiles.get(index);
+        offeredTiles = List.of();
+    }
+
+    /** True while the Forensic Scientist still has to choose, place or answer the new tile. */
     public boolean isReplacementPending() {
-        return pendingTile != null;
+        return !offeredTiles.isEmpty() || pendingTile != null;
     }
 
     public HintTile getPendingTile() {
@@ -233,8 +307,94 @@ public class Game
 
     public void addReplacementHint(int optionIndex) {
         hintTiles.set(pendingSlot, pendingTile);
-        hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex)));
+        hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex),
+                pendingTile.subject()));
         pendingTile = null;
         pendingSlot = null;
+    }
+
+    // ---------------------------------------------------------------- Forensic lab
+
+    /** The lab works on the cards once the scene report of the current round is complete. */
+    public boolean isLabOpen() {
+        return isCrimeSealed() && allHintsGiven() && !isReplacementPending();
+    }
+
+    public boolean hasTestLeft(long userId) {
+        return testsInCurrentRound.getOrDefault(userId, 0) < LAB_TESTS_PER_ROUND;
+    }
+
+    public boolean canTest(long userId) {
+        return getRole(userId).filter(role -> role != Role.FORENSIC_SCIENTIST).isPresent()
+                && isLabOpen()
+                && hasTestLeft(userId);
+    }
+
+    public Optional<LabResult> findLabResult(Card card) {
+        return labResults.stream().filter(result -> result.card().equals(card)).findFirst();
+    }
+
+    /**
+     * Sends one card to the lab and uses the tester's test for this round.
+     * The lab cannot tell a real trace from a planted one.
+     */
+    public LabResult testCard(long testerId, Player owner, Card card) {
+        Player tester = getPlayer(testerId).orElseThrow();
+        testsInCurrentRound.merge(testerId, 1, Integer::sum);
+        LabResult result = new LabResult(round, tester, owner, card, leavesTrace(card));
+        labResults.add(result);
+        return result;
+    }
+
+    private boolean leavesTrace(Card card) {
+        return card.equals(murderWeapon) || card.equals(keyEvidence)
+                || card.equals(plantedMeans) || card.equals(plantedClue);
+    }
+
+    public List<LabResult> getLabResults() {
+        return Collections.unmodifiableList(labResults);
+    }
+
+    /** How many lab tests were used in the current round. */
+    public int getTestsUsedThisRound() {
+        return testsInCurrentRound.values().stream().mapToInt(Integer::intValue).sum();
+    }
+
+    /** How many lab tests real players have per round. Test players never use the lab. */
+    public int getTestsPerRound() {
+        return (int) getSuspects().stream().filter(player -> player.userId() > 0).count() * LAB_TESTS_PER_ROUND;
+    }
+
+    // ---------------------------------------------------------------- Accusations
+
+    public boolean hasAccused(long userId) {
+        return usedAccusations.contains(userId);
+    }
+
+    public boolean canAccuse(long userId) {
+        Optional<Player> player = getPlayer(userId);
+        return player.isPresent()
+                && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
+                && isCrimeSealed()
+                && !usedAccusations.contains(userId);
+    }
+
+    public AccusationResult accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
+        usedAccusations.add(accuserId);
+        if (suspect.equals(getMurderer()) && weapon.equals(murderWeapon) && evidence.equals(keyEvidence)) {
+            return AccusationResult.SOLVED;
+        }
+        if (suspect.equals(scapegoat) && weapon.equals(plantedMeans) && evidence.equals(plantedClue)) {
+            return AccusationResult.WRONGFUL_CONVICTION;
+        }
+        return AccusationResult.WRONG;
+    }
+
+    public boolean allInvestigatorsDone() {
+        return roles.entrySet().stream()
+                .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
+                .map(Map.Entry::getKey)
+                .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
+                .allMatch(player -> usedAccusations.contains(player.userId()));
     }
 }
