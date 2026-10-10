@@ -5,6 +5,8 @@ import java.util.*;
 public class Game
 {
 
+    private final Room room;
+    private final boolean practice;
     private final Map<Player, Role> roles = new LinkedHashMap<>();
     private final Map<Player, Hand> hands = new LinkedHashMap<>();
 
@@ -25,7 +27,11 @@ public class Game
 
     private final Set<Long> usedAccusations = new HashSet<>();
 
-    public Game(List<Player> players, Player forcedPlayer, Role forcedRole) {
+    public Game(Room room, List<Player> players, Player forcedPlayer, Role forcedRole) {
+        this.room = room;
+        this.practice = forcedRole != null
+                || players.stream().anyMatch(player -> player.userId() < 0);
+
         List<Player> shuffled = new ArrayList<>(players);
         Collections.shuffle(shuffled);
 
@@ -57,6 +63,15 @@ public class Game
             case 1 -> Role.MURDERER;
             default -> Role.INVESTIGATOR;
         };
+    }
+
+    public Room getRoom() {
+        return room;
+    }
+
+    /** A practice case uses test players or a forced role and does not count for statistics. */
+    public boolean isPractice() {
+        return practice;
     }
 
     public Map<Player, Role> getRoles() {
@@ -131,6 +146,10 @@ public class Game
         hints.add(new Hint(tile.title(), tile.options().get(optionIndex)));
     }
 
+    public int getTileCount() {
+        return hintTiles.size();
+    }
+
     public boolean allHintsGiven() {
         return hints.size() >= hintTiles.size();
     }
@@ -148,6 +167,14 @@ public class Game
         return roles.keySet().stream()
                 .filter(player -> player.userId() == userId)
                 .findFirst();
+    }
+
+    public Optional<Role> getRole(long userId) {
+        return getPlayer(userId).map(roles::get);
+    }
+
+    public boolean hasAccused(long userId) {
+        return usedAccusations.contains(userId);
     }
 
     public boolean canAccuse(long userId) {

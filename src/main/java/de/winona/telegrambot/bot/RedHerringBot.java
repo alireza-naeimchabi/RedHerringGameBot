@@ -150,7 +150,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         Player forcedPlayer = (forcedRole != null)
                 ? new Player(message.getFrom().getId(), message.getFrom().getFirstName())
                 : null;
-        Game game = gameService.startGame(chatId, lobby.getPlayers(), forcedPlayer, forcedRole);
+        Game game = gameService.startGame(lobby.getRoom(), lobby.getPlayers(), forcedPlayer, forcedRole);
         lobbyService.removeLobby(chatId, RoomEnd.CASE_STARTED);
 
         game.getRoles().forEach((player, role) ->
