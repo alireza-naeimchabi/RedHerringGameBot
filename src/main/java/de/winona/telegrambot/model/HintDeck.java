@@ -20,28 +20,32 @@ public class HintDeck {
     public static final int EVIDENCE_TILES_AT_START = 3;
     public static final int TILES_OFFERED_PER_ROUND = 2;
 
+    /** Deliberately general: each answer fits two card families, about a third of all means. */
     private static final HintTile CAUSE_OF_DEATH = new HintTile("Cause of death", MEANS,
-            List.of("Suffocation", "Cut", "Stab wound", "Heavy blow", "Poisoning", "Shot"));
+            List.of("Bleeding wound", "Blunt force", "No visible wound"));
 
     private static final List<HintTile> MEANS_TILES = List.of(
             new HintTile("The means comes from", MEANS,
-                    List.of("Kitchen", "Toolbox", "Bathroom cabinet", "Bedroom", "Sports bag", "Somewhere else")),
+                    List.of("Kitchen", "Workshop or garage", "Bathroom",
+                            "Living room", "Bedroom or wardrobe", "Garden or shed")),
             new HintTile("The means is made of", MEANS,
-                    List.of("Metal", "Wood", "Fabric", "Plastic or rubber", "Glass or stone", "Chemicals")),
+                    List.of("Metal", "Wood", "Cloth or cord", "Glass or ceramic", "Liquid or powder", "Several materials")),
             new HintTile("Size of the means", MEANS,
                     List.of("Fits in a pocket", "Fits in one hand", "Fits in a bag",
                             "Needs two hands", "Longer than an arm", "Soft and foldable")),
             new HintTile("Sound of the crime", MEANS,
-                    List.of("Silent", "A dull thud", "A struggle", "A sharp crack", "Breaking glass", "A loud bang")),
+                    List.of("Silent", "A dull thud", "A struggle",
+                            "A short cry", "Something fell over", "A door slammed")),
             new HintTile("Blood at the scene", MEANS,
                     List.of("None", "A few drops", "A trail", "A pool", "On the walls", "Wiped away")),
             new HintTile("The attack", MEANS,
                     List.of("In the victim's sleep", "From behind", "Face to face",
-                            "From a distance", "Slow and patient", "In sudden anger")));
+                            "Without a fight", "Slow and patient", "In sudden anger")));
 
     private static final List<HintTile> EVIDENCE_TILES = List.of(
             new HintTile("The key evidence is made of", KEY_EVIDENCE,
-                    List.of("Metal", "Paper", "Fabric or leather", "Plastic", "Glass", "Something organic")),
+                    List.of("Metal", "Paper", "Fabric or leather", "Plastic",
+                            "Several materials", "Something organic")),
             new HintTile("The key evidence is something you", KEY_EVIDENCE,
                     List.of("Wear", "Read or write", "Travel or pay with",
                             "Eat, drink or smoke", "Open or switch on", "Lose without noticing")),
@@ -52,7 +56,7 @@ public class HintDeck {
                     List.of("In the victim's hand", "On the floor", "On a table",
                             "In the bin", "By the door", "Outside")),
             new HintTile("The key evidence tells us about", KEY_EVIDENCE,
-                    List.of("A journey", "Appearance", "A habit", "A relationship", "A struggle", "The weather")));
+                    List.of("A journey", "Appearance", "A habit", "A relationship", "Money", "Work")));
 
     private final Deque<HintTile> meansPile = shuffled(MEANS_TILES);
     private final Deque<HintTile> evidencePile = shuffled(EVIDENCE_TILES);

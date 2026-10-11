@@ -293,7 +293,7 @@ class RedHerringBotTest {
         for (int i = 1; i <= 6; i++) {
             assertTrue(tile.html.contains("SCENE TILE " + i + " OF 6"));
             assertTrue(tile.html.contains(i <= 3 ? "describes the Means of Murder" : "describes the Key Evidence"));
-            assertEquals(6, tile.buttons().size());
+            assertEquals(i == 1 ? 3 : 6, tile.buttons().size(), "Cause of death has three general answers");
             String firstOption = tile.buttons().get(0).getCallbackData();
             press(scientist, tile, firstOption);
             press(scientist, tile, firstOption); // a second tap on the old button changes nothing
