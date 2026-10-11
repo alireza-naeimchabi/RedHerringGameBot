@@ -341,9 +341,10 @@ class RedHerringBotTest {
         // Round 2: the Forensic Scientist chooses one of two new tiles and replaces an old answer.
         press(scientist, tile, tile.button("Next Round").orElseThrow().getCallbackData());
         assertTrue(tile.html.contains("Choose your new scene tile"));
-        assertEquals(2, tile.buttons().size());
+        assertEquals(3, tile.buttons().size());
         assertTrue(tile.buttons().get(0).getText().startsWith("🔪"));
         assertTrue(tile.buttons().get(1).getText().startsWith("🔍"));
+        assertTrue(tile.buttons().get(2).getText().startsWith("👤"), "the murderer profile is offered too");
         group(second, "/lab");
         assertTrue(telegram.last(GROUP).html.contains("The lab opens when the scene report"));
         press(scientist, tile, tile.buttons().get(1).getCallbackData());

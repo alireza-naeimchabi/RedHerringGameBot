@@ -8,6 +8,7 @@ import java.util.List;
 
 import static de.winona.telegrambot.model.TileSubject.KEY_EVIDENCE;
 import static de.winona.telegrambot.model.TileSubject.MEANS;
+import static de.winona.telegrambot.model.TileSubject.MURDERER;
 
 /**
  * The scene tiles the Forensic Scientist answers.
@@ -57,6 +58,14 @@ public class HintDeck {
                             "In the bin", "By the door", "Outside")),
             new HintTile("The key evidence tells us about", KEY_EVIDENCE,
                     List.of("A journey", "Appearance", "A habit", "A relationship", "Money", "Work")));
+
+    /**
+     * One general detail about the murderer as a person. Offered from round 2 on,
+     * until the Forensic Scientist has used it once in this case.
+     */
+    public static final HintTile MURDERER_PROFILE = new HintTile("Profile of the murderer", MURDERER,
+            List.of("Has spoken a lot", "Has been quiet", "Has used the lab",
+                    "Has not used the lab", "Has blamed someone", "Has defended someone"));
 
     private final Deque<HintTile> meansPile = shuffled(MEANS_TILES);
     private final Deque<HintTile> evidencePile = shuffled(EVIDENCE_TILES);

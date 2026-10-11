@@ -435,7 +435,11 @@ public final class GameScreens {
     }
 
     private static String subjectIcon(TileSubject subject) {
-        return subject == TileSubject.MEANS ? Theme.ICON_MEANS : Theme.ICON_CLUE;
+        return switch (subject) {
+            case MEANS -> Theme.ICON_MEANS;
+            case KEY_EVIDENCE -> Theme.ICON_CLUE;
+            case MURDERER -> Theme.ICON_PROFILE;
+        };
     }
 
     private static String cardIcon(Card card) {
@@ -443,11 +447,13 @@ public final class GameScreens {
     }
 
     private static String tileQuestion(Texts t, Game game, HintTile tile) {
-        boolean aboutMeans = tile.subject() == TileSubject.MEANS;
+        String describes = switch (tile.subject()) {
+            case MEANS -> t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())));
+            case KEY_EVIDENCE -> t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())));
+            case MURDERER -> t.get("tile.describes.murderer", bold(name(t, game.getMurderer())));
+        };
         return subjectIcon(tile.subject()) + " " + bold(t.tile(tile.title())) + "\n"
-                + (aboutMeans
-                ? t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())))
-                : t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())))) + "\n"
+                + describes + "\n"
                 + t.get("tile.pick");
     }
 

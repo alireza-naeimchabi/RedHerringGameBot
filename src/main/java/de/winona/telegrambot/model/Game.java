@@ -272,7 +272,11 @@ public class Game
     public List<HintTile> startNextRound() {
         round++;
         testsInCurrentRound.clear();
-        offeredTiles = hintDeck.drawOffer();
+        List<HintTile> offer = new ArrayList<>(hintDeck.drawOffer());
+        if (hints.stream().noneMatch(hint -> hint.subject() == TileSubject.MURDERER)) {
+            offer.add(HintDeck.MURDERER_PROFILE);
+        }
+        offeredTiles = offer;
         pendingTile = null;
         pendingSlot = null;
         return offeredTiles;
