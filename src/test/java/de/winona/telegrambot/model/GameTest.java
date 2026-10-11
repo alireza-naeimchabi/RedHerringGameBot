@@ -158,6 +158,28 @@ class GameTest {
     }
 
     @Test
+    void theMurdererCanAccuseButNeverDecidesTheCase() {
+        Hand real = game.getMurdererHand();
+        Hand framed = game.getScapegoatHand();
+
+        assertTrue(game.canAccuse(murderer.userId()), "the button gives nothing away");
+        assertEquals(AccusationResult.WRONG,
+                game.accuse(murderer.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3)),
+                "the murderer cannot convict the player they framed");
+        assertTrue(game.hasAccused(murderer.userId()));
+        assertFalse(game.allInvestigatorsDone(), "the murderer's attempt does not count");
+        assertEquals(AccusationResult.SOLVED,
+                game.accuse(bystander.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+    }
+
+    @Test
+    void theMurdererCannotGiveUpTheCaseOnPurpose() {
+        Hand real = game.getMurdererHand();
+        assertEquals(AccusationResult.WRONG,
+                game.accuse(murderer.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+    }
+
+    @Test
     void anAccusationIsSolvedWrongOrAWrongfulConviction() {
         Hand real = game.getMurdererHand();
         Hand framed = game.getScapegoatHand();

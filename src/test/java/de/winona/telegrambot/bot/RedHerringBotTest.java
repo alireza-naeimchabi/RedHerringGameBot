@@ -440,6 +440,29 @@ class RedHerringBotTest {
     }
 
     @Test
+    void theMurdererCannotConvictTheirOwnScapegoat() {
+        openCaseWithFourPlayers();
+        User scientist = playerWithRole("FORENSIC SCIENTIST");
+        User murderer = playerWithRole("MURDERER");
+        Crime crime = commitCrime(murderer, 0, 0);
+        answerAllTiles(scientist);
+        Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
+
+        // The murderer knows where the red herring is, but naming it does not end the case.
+        accuse(murderer, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
+        Shown answer = telegram.last(GROUP);
+        assertTrue(answer.html.contains("No."), answer.html);
+        assertTrue(answer.html.contains(murderer.getFirstName() + " has used their attempt"), answer.html);
+        assertTrue(telegram.find(GROUP, "It was a red herring.").isEmpty());
+        assertTrue(telegram.find(GROUP, "UNSOLVED").isEmpty(), "the case goes on");
+
+        // An investigator can still solve it.
+        User investigator = playerWithRole("INVESTIGATOR");
+        accuse(investigator, report, murderer.getFirstName(), crime.means, crime.keyEvidence, null);
+        assertTrue(telegram.last(GROUP).html.contains("SOLVED"));
+    }
+
+    @Test
     void theMurdererEscapesWhenRoundThreeEndsWithoutASolution() {
         String code = openCaseWithFourPlayers();
         User scientist = playerWithRole("FORENSIC SCIENTIST");

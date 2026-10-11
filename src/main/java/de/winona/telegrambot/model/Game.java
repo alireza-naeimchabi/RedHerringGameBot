@@ -390,8 +390,17 @@ public class Game
                 && !usedAccusations.contains(userId);
     }
 
+    /**
+     * Judges an accusation and uses the accuser's single attempt.
+     * The murderer may accuse too, so that pressing the button gives nothing away,
+     * but their accusation is always wrong: they cannot convict the player they framed
+     * themselves, and they cannot give up the case on purpose.
+     */
     public AccusationResult accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
         usedAccusations.add(accuserId);
+        if (accuserId == getMurderer().userId()) {
+            return AccusationResult.WRONG;
+        }
         if (suspect.equals(getMurderer()) && weapon.equals(murderWeapon) && evidence.equals(keyEvidence)) {
             return AccusationResult.SOLVED;
         }
