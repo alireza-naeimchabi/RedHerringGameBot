@@ -290,15 +290,17 @@ class RedHerringBotTest {
         Shown tile = telegram.find(scientist.getId(), "SCENE TILE 1 OF 6").orElseThrow();
         assertTrue(tile.html.contains("Cause of death"));
         assertTrue(tile.html.contains("describes the Means of Murder: <b>" + crime.means + "</b>"));
+        assertTrue(tile.buttons().isEmpty(), "the Forensic Scientist types the answer");
+        say(scientist, "It was the " + crime.means);
+        assertTrue(telegram.last(scientist.getId()).html.contains("names a player or a card"),
+                "an answer must not name a card");
         for (int i = 1; i <= 6; i++) {
-            assertTrue(tile.html.contains("SCENE TILE " + i + " OF 6"));
+            tile = telegram.find(scientist.getId(), "SCENE TILE " + i + " OF 6").orElseThrow();
             assertTrue(tile.html.contains(i <= 3 ? "describes the Means of Murder" : "describes the Key Evidence"));
-            assertEquals(i == 1 ? 3 : 6, tile.buttons().size(), "Cause of death has three general answers");
-            String firstOption = tile.buttons().get(0).getCallbackData();
-            press(scientist, tile, firstOption);
-            press(scientist, tile, firstOption); // a second tap on the old button changes nothing
+            say(scientist, "Typed answer " + i);
+            assertTrue(telegram.last(GROUP).html.contains("Typed answer " + i), "the group sees the answer");
         }
-        assertTrue(tile.html.contains("ROUND 1 REPORT IS OUT"));
+        tile = telegram.find(scientist.getId(), "ROUND 1 REPORT IS OUT").orElseThrow();
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
         assertEquals(3, countOccurrences(report.html, "🔪 "));
         assertEquals(3, countOccurrences(report.html, "🔍 "));
@@ -349,7 +351,7 @@ class RedHerringBotTest {
         assertTrue(telegram.last(GROUP).html.contains("The lab opens when the scene report"));
         press(scientist, tile, tile.buttons().get(1).getCallbackData());
         assertEquals(5, tile.buttons().size(), "only Cause of death cannot be replaced");
-        press(scientist, tile, tile.buttons().get(0).getCallbackData());
+        say(scientist, "A new typed answer");
         assertTrue(tile.html.contains("NEW SCENE TILE"));
         press(scientist, tile, tile.buttons().get(3).getCallbackData());
         Shown secondReport = telegram.last(GROUP);
@@ -474,7 +476,8 @@ class RedHerringBotTest {
             press(scientist, tile, tile.button("Next Round").orElseThrow().getCallbackData());
             press(scientist, tile, tile.buttons().get(0).getCallbackData()); // new tile
             press(scientist, tile, tile.buttons().get(1).getCallbackData()); // answer to replace
-            press(scientist, tile, tile.buttons().get(0).getCallbackData()); // option
+            say(scientist, "Answer in round " + round); // the new answer is typed
+            tile = telegram.last(scientist.getId());
         }
         assertTrue(tile.html.contains("final round"));
         press(scientist, tile, tile.button("Close the Case").orElseThrow().getCallbackData());
@@ -631,12 +634,13 @@ class RedHerringBotTest {
         return new Crime(means, keyEvidence, scapegoat, plantedMeans, plantedClue);
     }
 
-    private Shown answerAllTiles(User scientist) {
+    private Shown answerAllTiles(User scientist)
+    {
         Shown tile = telegram.find(scientist.getId(), "SCENE TILE 1 OF 6").orElseThrow();
-        for (int i = 0; i < 6; i++) {
-            press(scientist, tile, tile.buttons().get(i).getCallbackData());
+        for (int i = 1; i <= 6; i++) {
+            say(scientist, "Answer " + i);
         }
-        return tile;
+        return telegram.find(scientist.getId(), "ROUND 1 REPORT IS OUT").orElseThrow();
     }
 
     /** Sends one card to the lab by button labels and returns the message with the result. */

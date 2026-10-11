@@ -22,6 +22,8 @@ import de.winona.telegrambot.ui.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.User;
+import de.winona.telegrambot.i18n.Language;
+import java.util.regex.Pattern;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +40,8 @@ import java.util.function.Function;
  * <p>Languages: what goes to the group is written for all players of the case, what goes to
  * one player uses that player's language, see {@link Localizer}.
  */
-public class GameController {
+public class GameController
+{
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
@@ -245,6 +248,70 @@ public class GameController {
         Hint placed = game.getHints().get(game.getHints().size() - 1);
         sendToGroup(game, t -> GameScreens.tileAnswered(t, game, placed));
         askForNextTile(game, click.message());
+    }
+
+    // ---------------------------------------------------------------- Typed answers
+
+    /**
+     * Text the Forensic Scientist typed in the private chat. If a scene tile is open,
+     * the text is the answer to it.
+     *
+     * @return false if the text is not an answer, so the dashboard can handle it
+     */
+    public boolean onPrivateText(User user, String text) {
+        Optional<Game> gameOpt = gameService.gamesOf(user.getId()).stream()
+                .filter(game -> game.getForensicScientist().userId() == user.getId())
+                .filter(Game::isWaitingForTypedAnswer)
+                .findFirst();
+        if (gameOpt.isEmpty()) {
+            return false;
+        }
+        Game game = gameOpt.get();
+        Player scientist = game.getForensicScientist();
+
+        Optional<Msg> problem = whyAnswerIsRejected(game, text);
+        if (problem.isPresent()) {
+            sendPrivately(scientist, t -> GameScreens.notice(t, Theme.ICON_WRONG, problem.get()));
+            return true;
+        }
+
+        boolean replacesOldAnswer = game.hasPendingSlot();
+        game.addTypedAnswer(text);
+
+        if (replacesOldAnswer) {
+            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+            sendPrivately(scientist, t -> GameScreens.tilesPlaced(t, game));
+        } else {
+            Hint placed = game.getHints().get(game.getHints().size() - 1);
+            sendToGroup(game, t -> GameScreens.tileAnswered(t, game, placed));
+            askForNextTile(game, null);
+        }
+        return true;
+    }
+
+    /** A typed answer must be short and must not name a player or a card on the table. */
+    private Optional<Msg> whyAnswerIsRejected(Game game, String answer) {
+        if (answer.codePointCount(0, answer.length()) > Game.MAX_ANSWER_LENGTH) {
+            return Optional.of(Msg.of("err.answer.too_long", Game.MAX_ANSWER_LENGTH));
+        }
+        List<String> forbidden = new ArrayList<>();
+        game.getRoles().keySet().forEach(player -> forbidden.add(player.name()));
+        for (Hand hand : game.getHands().values()) {
+            List<Card> cards = new ArrayList<>(hand.weapons());
+            cards.addAll(hand.evidence());
+            for (Card card : cards) {
+                for (Language language : Language.values()) {
+                    forbidden.add(Texts.of(language).card(card));
+                }
+            }
+        }
+        boolean namesSomething = forbidden.stream().anyMatch(word -> mentions(answer, word));
+        return namesSomething ? Optional.of(Msg.of("err.answer.forbidden")) : Optional.empty();
+    }
+
+    /** True if the text contains the word on its own, not as part of a longer word. Ignores case. */
+    private static boolean mentions(String text, String word) {
+        return Pattern.compile("(?iU)(?<!\\w)" + Pattern.quote(word) + "(?!\\w)").matcher(text).find();
     }
 
     // ---------------------------------------------------------------- Rounds

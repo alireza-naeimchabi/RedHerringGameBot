@@ -26,6 +26,9 @@ public class Game
     public static final int FIXED_TILES = 1;
     public static final int LAB_TESTS_PER_ROUND = 1;
 
+    /** A typed answer of the Forensic Scientist may be at most this long. */
+    public static final int MAX_ANSWER_LENGTH = 60;
+
     private final Room room;
     private final boolean practice;
     private final Map<Player, Role> roles = new LinkedHashMap<>();
@@ -316,12 +319,40 @@ public class Game
         pendingSlot = slot;
     }
 
-    public void addReplacementHint(int optionIndex) {
+    public void addReplacementHint(int optionIndex)
+    {
         hintTiles.set(pendingSlot, pendingTile);
         hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex),
                 pendingTile.subject()));
         pendingTile = null;
         pendingSlot = null;
+    }
+
+    // ---------------------------------------------------------------- Typed answers
+
+    /** True while the Forensic Scientist has a scene tile open that they answer by typing. */
+    public boolean isWaitingForTypedAnswer()
+    {
+        return isCrimeSealed() && (getCurrentHintTile().isPresent() || hasPendingSlot());
+    }
+
+    /** The scene tile the Forensic Scientist answers right now. */
+    public HintTile getOpenTile() {
+        return hasPendingSlot() ? pendingTile : getCurrentHintTile().orElseThrow();
+    }
+
+    /** Saves a typed answer: as the next answer in round 1, or in place of an old one in rounds 2 and 3. */
+    public void addTypedAnswer(String answer)
+    {
+        if (hasPendingSlot()) {
+            hintTiles.set(pendingSlot, pendingTile);
+            hints.set(pendingSlot, new Hint(pendingTile.title(), answer, pendingTile.subject(), true));
+            pendingTile = null;
+            pendingSlot = null;
+        } else {
+            HintTile tile = hintTiles.get(hints.size());
+            hints.add(new Hint(tile.title(), answer, tile.subject(), true));
+        }
     }
 
     // ---------------------------------------------------------------- Forensic lab
@@ -349,7 +380,8 @@ public class Game
      * Sends one card to the lab and uses the tester's test for this round.
      * The lab cannot tell a real trace from a planted one.
      */
-    public LabResult testCard(long testerId, Player owner, Card card) {
+    public LabResult testCard(long testerId, Player owner, Card card)
+    {
         Player tester = getPlayer(testerId).orElseThrow();
         testsInCurrentRound.merge(testerId, 1, Integer::sum);
         LabResult result = new LabResult(round, tester, owner, card, leavesTrace(card));
@@ -357,7 +389,8 @@ public class Game
         return result;
     }
 
-    private boolean leavesTrace(Card card) {
+    private boolean leavesTrace(Card card)
+    {
         return card.equals(murderWeapon) || card.equals(keyEvidence)
                 || card.equals(plantedMeans) || card.equals(plantedClue);
     }
