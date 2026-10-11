@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -138,6 +140,21 @@ class GameTest {
         List<HintTile> round3 = game.startNextRound();
         assertEquals(2, round3.size());
         assertFalse(round3.contains(HintDeck.MURDERER_PROFILE), "the profile is used up");
+    }
+
+    @Test
+    void playersKeepTheirSeatOrderSoNoListGivesARoleAway() {
+        assertEquals(players, new ArrayList<>(game.getRoles().keySet()));
+        List<Player> seatsWithoutScientist = new ArrayList<>(players);
+        seatsWithoutScientist.remove(game.getForensicScientist());
+        assertEquals(seatsWithoutScientist, game.getSuspects());
+
+        Set<Integer> murdererPositions = new HashSet<>();
+        for (int i = 0; i < 200; i++) {
+            Game another = new Game(new Room("TEST", -1, "Group", HOST, Instant.now()), players, null, null);
+            murdererPositions.add(another.getSuspects().indexOf(another.getMurderer()));
+        }
+        assertEquals(4, murdererPositions.size(), "the murderer can sit anywhere in the suspect list");
     }
 
     @Test

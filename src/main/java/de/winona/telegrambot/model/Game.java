@@ -73,9 +73,16 @@ public class Game
             shuffled.add(index, forcedPlayer);
         }
 
+        // The shuffled order decides the roles. The players are stored in their seat order,
+        // otherwise the murderer would always be listed first among the suspects.
+        Map<Player, Role> drawn = new HashMap<>();
         for (int i = 0; i < shuffled.size(); i++)
         {
-            roles.put(shuffled.get(i), roleForIndex(i));
+            drawn.put(shuffled.get(i), roleForIndex(i));
+        }
+        for (Player player : players)
+        {
+            roles.put(player, drawn.get(player));
         }
 
         CardDeck deck = new CardDeck();
