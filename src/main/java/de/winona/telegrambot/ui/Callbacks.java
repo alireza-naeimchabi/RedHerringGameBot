@@ -20,6 +20,7 @@ public final class Callbacks {
     public static final String STATISTICS = "m:stats";
     public static final String LEADERBOARD = "m:top";
     public static final String PROFILE = "m:me";
+    public static final String LANGUAGE = "m:lang";
     public static final String NO_ACTION = "m:noop";
 
     // Game actions (the first part is kept short, the group chat id follows)
@@ -35,6 +36,14 @@ public final class Callbacks {
     public static final String ACCUSE_CANCEL = "AX";
     public static final String NEXT_ROUND = "NR";
     public static final String EVIDENCE_BOARD = "EB";
+    public static final String FRAME_PLAYER = "FP";
+    public static final String FRAME_MEANS = "FM";
+    public static final String FRAME_CLUE = "FC";
+    public static final String OFFERED_TILE = "T";
+    public static final String LAB_START = "LT";
+    public static final String LAB_SUSPECT = "LP";
+    public static final String LAB_CARD = "LC";
+    public static final String LAB_CANCEL = "LX";
 
     private Callbacks() {
     }
@@ -45,6 +54,11 @@ public final class Callbacks {
 
     public static String roles(int page) {
         return "m:roles:" + page;
+    }
+
+    /** Sets the reader's language. The value is the stored language code, never a translated name. */
+    public static String setLanguage(String languageCode) {
+        return "m:setlang:" + languageCode;
     }
 
     public static String roomDetails(String code) {

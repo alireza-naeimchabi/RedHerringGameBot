@@ -1,5 +1,6 @@
 package de.winona.telegrambot.util;
 
+import java.util.Locale;
 import java.util.Random;
 import java.util.function.Predicate;
 
@@ -23,9 +24,27 @@ public final class RoomCodeGenerator {
         return code;
     }
 
-    /** Brings user input into the form codes are stored in. */
+    /**
+     * Brings user input into the form codes are stored in. A code copied out of a Persian
+     * message can carry invisible direction marks, and a Persian keyboard types ۷ instead of 7:
+     * both still mean the same code.
+     */
     public static String normalize(String input) {
-        return input == null ? "" : input.trim().toUpperCase();
+        if (input == null) {
+            return "";
+        }
+        StringBuilder code = new StringBuilder();
+        input.codePoints().forEach(codePoint -> {
+            if (Character.getType(codePoint) == Character.FORMAT) {
+                return; // direction marks, zero-width joiners and similar
+            }
+            if (Character.isDigit(codePoint)) {
+                code.append(Character.digit(codePoint, 10));
+            } else {
+                code.appendCodePoint(codePoint);
+            }
+        });
+        return code.toString().trim().toUpperCase(Locale.ROOT);
     }
 
     public static boolean looksLikeCode(String input) {

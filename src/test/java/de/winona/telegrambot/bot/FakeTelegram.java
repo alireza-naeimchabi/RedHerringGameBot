@@ -72,7 +72,7 @@ public class FakeTelegram {
     public record Answer(String text, boolean alert, String url) {
     }
 
-    private static final Set<String> ALLOWED_TAGS = Set.of("b", "i", "code", "pre", "blockquote");
+    private static final Set<String> ALLOWED_TAGS = Set.of("b", "i", "s", "code", "pre", "blockquote");
     private static final Pattern TAG = Pattern.compile("<(/?)([a-zA-Z]+)[^>]*>");
 
     private final Map<String, Shown> messages = new LinkedHashMap<>();
@@ -144,12 +144,14 @@ public class FakeTelegram {
             Shown shown = newMessage(chatId);
             shown.photo = true;
             shown.banner = send.getPhoto().isNew() ? send.getPhoto().getMediaName() : send.getPhoto().getAttachName();
-            shown.html = send.getCaption();
+            shown.html = send.getCaption() == null ? "" : send.getCaption();
             shown.keyboard = (InlineKeyboardMarkup) send.getReplyMarkup();
             if (send.getPhoto().isNew() && send.getPhoto().getNewMediaStream() == null) {
                 problems.add("Photo without image data in chat " + chatId);
             }
-            check(shown, send.getParseMode());
+            if (!shown.html.isEmpty()) {
+                check(shown, send.getParseMode());
+            }
             return toMessage(shown);
         }
         if (method instanceof EditMessageText edit) {

@@ -1,11 +1,15 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.i18n.Msg;
+import de.winona.telegrambot.i18n.Texts;
+import de.winona.telegrambot.model.AccusationResult;
 import de.winona.telegrambot.model.Card;
 import de.winona.telegrambot.model.CardDeck;
 import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Hand;
 import de.winona.telegrambot.model.Hint;
 import de.winona.telegrambot.model.HintTile;
+import de.winona.telegrambot.model.LabResult;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.Role;
 import de.winona.telegrambot.model.Room;
@@ -19,26 +23,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.User;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.function.Function;
 
 /**
  * Runs a case from the moment it opens until the verdict:
- * roles, the murderer's choice, the scene tiles, the rounds and the accusations.
+ * roles, the murderer's choice and red herring, the scene tiles, the lab, the rounds
+ * and the accusations.
  * The rules themselves live in {@link Game}; this class connects them to the chat.
+ *
+ * <p>Languages: what goes to the group is written for all players of the case, what goes to
+ * one player uses that player's language, see {@link Localizer}.
  */
 public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
     private final Messenger messenger;
+    private final Localizer localizer;
     private final GameService gameService;
     private final StatsService statsService;
     private final Random random = new Random();
 
-    public GameController(Messenger messenger, GameService gameService, StatsService statsService) {
+    public GameController(Messenger messenger, Localizer localizer, GameService gameService,
+                          StatsService statsService) {
         this.messenger = messenger;
+        this.localizer = localizer;
         this.gameService = gameService;
         this.statsService = statsService;
     }
@@ -46,14 +59,13 @@ public class GameController {
     // ---------------------------------------------------------------- Opening the case
 
     public void openCase(Room room, List<Player> players, Player forcedPlayer, Role forcedRole) {
-        long chatId = room.groupChatId();
         Game game = gameService.startGame(room, players, forcedPlayer, forcedRole);
 
         game.getRoles().forEach((player, role) ->
-                sendPrivately(player, GameScreens.roleBriefing(game, role)));
+                sendPrivately(player, t -> GameScreens.roleBriefing(t, game, role)));
 
-        messenger.send(chatId, GameScreens.caseOpened(game));
-        messenger.send(chatId, GameScreens.evidenceBoard(game));
+        sendToGroup(game, t -> GameScreens.caseOpened(t, game));
+        sendToGroup(game, t -> GameScreens.evidenceBoard(t, game));
         startMurdererChoice(game);
     }
 
@@ -63,20 +75,25 @@ public class GameController {
         if (isTestPlayer(murderer)) {
             game.chooseWeapon(random.nextInt(CardDeck.CARDS_PER_TYPE));
             game.chooseEvidence(random.nextInt(CardDeck.CARDS_PER_TYPE));
+            game.chooseScapegoat(random.nextInt(game.getPossibleScapegoats().size()));
+            game.plantMeans(random.nextInt(CardDeck.CARDS_PER_TYPE));
+            game.plantClue(random.nextInt(CardDeck.CARDS_PER_TYPE));
             announceCrime(game);
             return;
         }
-        messenger.send(murderer.userId(), GameScreens.chooseMeans(game));
+        sendPrivately(murderer, t -> GameScreens.chooseMeans(t, game));
     }
 
     private void announceCrime(Game game) {
         if (game.isPractice()) {
             // Only practice cases print the solution, so the host cannot peek in a real case.
-            log.info("[PRACTICE] Case {}: {} / {} + {}", game.getRoom().code(), game.getMurderer().name(),
-                    game.getMurderWeapon().name(), game.getKeyEvidence().name());
+            log.info("[PRACTICE] Case {}: {} / {} + {}. Red herring on {}: {} + {}",
+                    game.getRoom().code(), game.getMurderer().name(),
+                    game.getMurderWeapon().name(), game.getKeyEvidence().name(),
+                    game.getScapegoat().name(), game.getPlantedMeans().name(), game.getPlantedClue().name());
         }
-        sendPrivately(game.getForensicScientist(), GameScreens.solutionForScientist(game));
-        messenger.send(game.getRoom().groupChatId(), GameScreens.crimeCommitted());
+        sendPrivately(game.getForensicScientist(), t -> GameScreens.solutionForScientist(t, game));
+        sendToGroup(game, GameScreens::crimeCommitted);
         askForNextTile(game, null);
     }
 
@@ -87,7 +104,7 @@ public class GameController {
         long groupChatId = click.longPart(1);
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
         if (gameOpt.isEmpty()) {
-            click.alert("This case is closed.");
+            click.alert("err.case_closed");
             return;
         }
         Game game = gameOpt.get();
@@ -95,18 +112,26 @@ public class GameController {
         switch (click.part(0)) {
             case Callbacks.WEAPON -> onMeansChosen(click, game);
             case Callbacks.EVIDENCE -> onKeyEvidenceChosen(click, game);
+            case Callbacks.FRAME_PLAYER -> onScapegoatChosen(click, game);
+            case Callbacks.FRAME_MEANS -> onMeansPlanted(click, game);
+            case Callbacks.FRAME_CLUE -> onCluePlanted(click, game);
             case Callbacks.HINT -> onTileAnswered(click, game);
+            case Callbacks.OFFERED_TILE -> onNewTileChosen(click, game);
             case Callbacks.REPLACE_SLOT -> onReplaceSlotChosen(click, game);
             case Callbacks.REPLACEMENT_HINT -> onReplacementAnswered(click, game);
             case Callbacks.NEXT_ROUND -> nextRound(game, click.user(), click.inPrivateChat() ? click.message() : null)
                     .ifPresent(click::alert);
-            case Callbacks.EVIDENCE_BOARD -> messenger.send(groupChatId, GameScreens.evidenceBoard(game));
+            case Callbacks.EVIDENCE_BOARD -> sendToGroup(game, t -> GameScreens.evidenceBoard(t, game));
+            case Callbacks.LAB_START -> startLabTest(game, click.user()).ifPresent(click::alert);
+            case Callbacks.LAB_SUSPECT -> onLabSuspectChosen(click, game);
+            case Callbacks.LAB_CARD -> onLabCardChosen(click, game);
+            case Callbacks.LAB_CANCEL -> onLabCancelled(click, game);
             case Callbacks.ACCUSE_START -> startAccusation(game, click.user()).ifPresent(click::alert);
             case Callbacks.ACCUSE_SUSPECT -> onAccusationStep(click, game);
             case Callbacks.ACCUSE_WEAPON -> onAccusationStep(click, game);
             case Callbacks.ACCUSE_EVIDENCE -> onAccusationFinished(click, game);
             case Callbacks.ACCUSE_CANCEL -> onAccusationCancelled(click, game);
-            default -> click.alert("This button is no longer valid.");
+            default -> click.alert("err.button_invalid");
         }
     }
 
@@ -115,27 +140,64 @@ public class GameController {
     private void onMeansChosen(Click click, Game game) {
         int index = click.intPart(2);
         if (game.getMurderer().userId() != click.userId() || game.hasWeapon() || !isCardIndex(index)) {
-            click.toast("This choice is already made.");
+            click.toast("err.choice_made");
             return;
         }
         game.chooseWeapon(index);
-        messenger.show(click.message(), GameScreens.chooseKeyEvidence(game));
+        showToClicker(click, t -> GameScreens.chooseKeyEvidence(t, game));
     }
 
     private void onKeyEvidenceChosen(Click click, Game game) {
         int index = click.intPart(2);
         if (game.getMurderer().userId() != click.userId() || !game.hasWeapon() || game.hasSolution()
                 || !isCardIndex(index)) {
-            click.toast("This choice is already made.");
+            click.toast("err.choice_made");
             return;
         }
         game.chooseEvidence(index);
-        messenger.show(click.message(), GameScreens.crimeSealed(game));
-        announceCrime(game);
+        showToClicker(click, t -> GameScreens.chooseScapegoat(t, game));
     }
 
     private boolean isCardIndex(int index) {
         return index >= 0 && index < CardDeck.CARDS_PER_TYPE;
+    }
+
+    // ---------------------------------------------------------------- Red herring
+
+    private boolean mayPlant(Click click, Game game) {
+        return game.getMurderer().userId() == click.userId() && game.hasSolution() && !game.isCrimeSealed();
+    }
+
+    private void onScapegoatChosen(Click click, Game game) {
+        int index = click.intPart(2);
+        if (!mayPlant(click, game) || game.hasScapegoat()
+                || index < 0 || index >= game.getPossibleScapegoats().size()) {
+            click.toast("err.choice_made");
+            return;
+        }
+        game.chooseScapegoat(index);
+        showToClicker(click, t -> GameScreens.choosePlantedMeans(t, game));
+    }
+
+    private void onMeansPlanted(Click click, Game game) {
+        int index = click.intPart(2);
+        if (!mayPlant(click, game) || !game.hasScapegoat() || game.hasPlantedMeans() || !isCardIndex(index)) {
+            click.toast("err.choice_made");
+            return;
+        }
+        game.plantMeans(index);
+        showToClicker(click, t -> GameScreens.choosePlantedClue(t, game));
+    }
+
+    private void onCluePlanted(Click click, Game game) {
+        int index = click.intPart(2);
+        if (!mayPlant(click, game) || !game.hasPlantedMeans() || !isCardIndex(index)) {
+            click.toast("err.choice_made");
+            return;
+        }
+        game.plantClue(index);
+        showToClicker(click, t -> GameScreens.crimeSealed(t, game));
+        announceCrime(game);
     }
 
     // ---------------------------------------------------------------- Scene tiles
@@ -156,11 +218,12 @@ public class GameController {
         }
 
         if (tileOpt.isEmpty()) {
-            messenger.send(game.getRoom().groupChatId(), GameScreens.sceneReport(game));
-            presentPrivately(scientist, inPlace, GameScreens.tilesPlaced(game));
+            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+            presentPrivately(scientist, inPlace, t -> GameScreens.tilesPlaced(t, game));
             return;
         }
-        presentPrivately(scientist, inPlace, GameScreens.sceneTile(game, tileOpt.get()));
+        HintTile tile = tileOpt.get();
+        presentPrivately(scientist, inPlace, t -> GameScreens.sceneTile(t, game, tile));
     }
 
     private void onTileAnswered(Click click, Game game) {
@@ -169,18 +232,18 @@ public class GameController {
         Optional<HintTile> tile = game.getCurrentHintTile();
 
         if (game.getForensicScientist().userId() != click.userId()) {
-            click.alert("Only the Forensic Scientist answers the scene tiles.");
+            click.alert("err.only_scientist_tiles");
             return;
         }
-        if (!game.hasSolution() || tile.isEmpty() || tileIndex != game.getCurrentHintIndex()
+        if (!game.isCrimeSealed() || tile.isEmpty() || tileIndex != game.getCurrentHintIndex()
                 || optionIndex < 0 || optionIndex >= tile.get().options().size()) {
-            click.toast("This tile is already answered.");
+            click.toast("err.tile_answered");
             return;
         }
 
         game.addHint(optionIndex);
         Hint placed = game.getHints().get(game.getHints().size() - 1);
-        messenger.send(game.getRoom().groupChatId(), GameScreens.tileAnswered(game, placed));
+        sendToGroup(game, t -> GameScreens.tileAnswered(t, game, placed));
         askForNextTile(game, click.message());
     }
 
@@ -189,12 +252,10 @@ public class GameController {
     public void nextRoundByCommand(long groupChatId, User user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
-            messenger.send(groupChatId, noCaseHere());
+            sendNoCaseHere(groupChatId, user);
             return;
         }
-        nextRound(game.get(), user, null)
-                .ifPresent(problem -> messenger.send(groupChatId,
-                        Screen.text(Theme.ICON_WRONG + " " + Theme.esc(problem))));
+        nextRound(game.get(), user, null).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
     /**
@@ -202,8 +263,7 @@ public class GameController {
      *
      * @return empty if it worked, otherwise the reason why not
      */
-    private Optional<String> nextRound(Game game, User user, MessageRef inPlace) {
-        long chatId = game.getRoom().groupChatId();
+    private Optional<Msg> nextRound(Game game, User user, MessageRef inPlace) {
         Player scientist = game.getForensicScientist();
 
         // If the Forensic Scientist is a test player, anyone at the table may move the case on.
@@ -211,31 +271,48 @@ public class GameController {
                 ? game.getPlayer(user.getId()).isPresent()
                 : scientist.userId() == user.getId();
         if (!allowed) {
-            return Optional.of("Only the Forensic Scientist, " + scientist.name() + ", can do that.");
+            return Optional.of(Msg.of("err.only_scientist", scientist.name()));
         }
         if (!game.allHintsGiven() || game.isReplacementPending()) {
-            return Optional.of("The current round is not finished yet.");
+            return Optional.of(Msg.of("err.round_not_finished"));
         }
         if (game.isLastRound()) {
             if (inPlace != null) {
-                messenger.show(inPlace, Screen.text(Theme.ICON_OK + " You closed the case."));
+                messenger.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
             }
-            closeCase(game, false, null, "Round " + Game.MAX_ROUNDS + " ended without a correct accusation.");
+            closeCase(game, false, null, Msg.of("verdict.reason.rounds", Game.MAX_ROUNDS));
             return Optional.empty();
         }
 
-        HintTile newTile = game.startNextRound();
-        messenger.send(chatId, GameScreens.roundStarted(game));
+        List<HintTile> offered = game.startNextRound();
+        sendToGroup(game, t -> GameScreens.roundStarted(t, game));
 
         if (isTestPlayer(scientist)) {
+            game.chooseOfferedTile(random.nextInt(offered.size()));
             int replaceable = game.getHints().size() - Game.FIXED_TILES;
             game.chooseSlotToReplace(Game.FIXED_TILES + random.nextInt(replaceable));
-            game.addReplacementHint(random.nextInt(newTile.options().size()));
-            messenger.send(chatId, GameScreens.sceneReport(game));
+            game.addReplacementHint(random.nextInt(game.getPendingTile().options().size()));
+            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
             return Optional.empty();
         }
-        presentPrivately(scientist, inPlace, GameScreens.chooseTileToReplace(game, newTile));
+        presentPrivately(scientist, inPlace, t -> GameScreens.chooseNewTile(t, game));
         return Optional.empty();
+    }
+
+    private void onNewTileChosen(Click click, Game game) {
+        int round = click.intPart(2);
+        int index = click.intPart(3);
+
+        if (game.getForensicScientist().userId() != click.userId()) {
+            click.alert("err.only_scientist_chooses");
+            return;
+        }
+        if (round != game.getRound() || index < 0 || index >= game.getOfferedTiles().size()) {
+            click.toast("err.tile_chosen");
+            return;
+        }
+        game.chooseOfferedTile(index);
+        showToClicker(click, t -> GameScreens.chooseTileToReplace(t, game, game.getPendingTile()));
     }
 
     private void onReplaceSlotChosen(Click click, Game game) {
@@ -243,16 +320,16 @@ public class GameController {
         int slot = click.intPart(3);
 
         if (game.getForensicScientist().userId() != click.userId()) {
-            click.alert("Only the Forensic Scientist replaces scene tiles.");
+            click.alert("err.only_scientist_replaces");
             return;
         }
-        if (round != game.getRound() || !game.isReplacementPending() || game.hasPendingSlot()
+        if (round != game.getRound() || game.getPendingTile() == null || game.hasPendingSlot()
                 || slot < Game.FIXED_TILES || slot >= game.getHints().size()) {
-            click.toast("This tile is already replaced.");
+            click.toast("err.tile_replaced");
             return;
         }
         game.chooseSlotToReplace(slot);
-        messenger.show(click.message(), GameScreens.replacementTile(game, game.getPendingTile()));
+        showToClicker(click, t -> GameScreens.replacementTile(t, game, game.getPendingTile()));
     }
 
     private void onReplacementAnswered(Click click, Game game) {
@@ -260,31 +337,145 @@ public class GameController {
         int optionIndex = click.intPart(3);
 
         if (game.getForensicScientist().userId() != click.userId()) {
-            click.alert("Only the Forensic Scientist answers the scene tiles.");
+            click.alert("err.only_scientist_tiles");
             return;
         }
         if (round != game.getRound() || !game.hasPendingSlot()
                 || optionIndex < 0 || optionIndex >= game.getPendingTile().options().size()) {
-            click.toast("This tile is already answered.");
+            click.toast("err.tile_answered");
             return;
         }
         game.addReplacementHint(optionIndex);
-        messenger.send(game.getRoom().groupChatId(), GameScreens.sceneReport(game));
-        messenger.show(click.message(), GameScreens.tilesPlaced(game));
+        sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+        showToClicker(click, t -> GameScreens.tilesPlaced(t, game));
     }
 
-    public void showSceneReport(long groupChatId) {
-        gameService.getGame(groupChatId).ifPresentOrElse(
-                game -> messenger.send(groupChatId, game.getHints().isEmpty()
-                        ? GameScreens.evidenceBoard(game)
-                        : GameScreens.sceneReport(game)),
-                () -> messenger.send(groupChatId, noCaseHere()));
+    public void showSceneReport(long groupChatId, User user) {
+        Optional<Game> game = gameService.getGame(groupChatId);
+        if (game.isEmpty()) {
+            sendNoCaseHere(groupChatId, user);
+            return;
+        }
+        sendToGroup(game.get(), t -> game.get().getHints().isEmpty()
+                ? GameScreens.evidenceBoard(t, game.get())
+                : GameScreens.sceneReport(t, game.get()));
     }
 
-    public void showEvidenceBoard(long groupChatId) {
-        gameService.getGame(groupChatId).ifPresentOrElse(
-                game -> messenger.send(groupChatId, GameScreens.evidenceBoard(game)),
-                () -> messenger.send(groupChatId, noCaseHere()));
+    public void showEvidenceBoard(long groupChatId, User user) {
+        Optional<Game> game = gameService.getGame(groupChatId);
+        if (game.isEmpty()) {
+            sendNoCaseHere(groupChatId, user);
+            return;
+        }
+        sendToGroup(game.get(), t -> GameScreens.evidenceBoard(t, game.get()));
+    }
+
+    // ---------------------------------------------------------------- Forensic lab
+
+    public void labTestByCommand(long groupChatId, User user) {
+        Optional<Game> game = gameService.getGame(groupChatId);
+        if (game.isEmpty()) {
+            sendNoCaseHere(groupChatId, user);
+            return;
+        }
+        startLabTest(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
+    }
+
+    private Optional<Msg> startLabTest(Game game, User user) {
+        Optional<Msg> problem = whyCannotTest(game, user.getId());
+        if (problem.isPresent()) {
+            return problem;
+        }
+        Player tester = game.getPlayer(user.getId()).orElseThrow();
+        sendToGroup(game, t -> GameScreens.labChooseSuspect(t, game, tester));
+        return Optional.empty();
+    }
+
+    private Optional<Msg> whyCannotTest(Game game, long userId) {
+        Optional<Role> role = game.getRole(userId);
+        if (role.isEmpty()) {
+            return Optional.of(Msg.of("err.not_in_case"));
+        }
+        if (role.get() == Role.FORENSIC_SCIENTIST) {
+            return Optional.of(Msg.of("err.lab.scientist"));
+        }
+        if (!game.isLabOpen()) {
+            return Optional.of(Msg.of("err.lab.closed"));
+        }
+        if (!game.hasTestLeft(userId)) {
+            return Optional.of(Msg.of("err.lab.used"));
+        }
+        return Optional.empty();
+    }
+
+    /** Checks that the person pressing the button started this lab test and may still test. */
+    private Optional<Player> testerOf(Click click, Game game) {
+        long testerId = click.longPart(2);
+        Optional<Player> tester = game.getPlayer(testerId);
+        if (tester.isEmpty() || testerId != click.userId()) {
+            click.alert("err.lab.belongs", ownerName(tester));
+            return Optional.empty();
+        }
+        Optional<Msg> problem = whyCannotTest(game, testerId);
+        if (problem.isPresent()) {
+            click.alert(problem.get());
+            return Optional.empty();
+        }
+        return tester;
+    }
+
+    /** The name of the player a flow belongs to, or "someone else" in the reader's language. */
+    private Object ownerName(Optional<Player> owner) {
+        return owner.<Object>map(Player::name).orElse(Msg.of("err.someone_else"));
+    }
+
+    private void onLabSuspectChosen(Click click, Game game) {
+        Optional<Player> tester = testerOf(click, game);
+        if (tester.isEmpty()) {
+            return;
+        }
+        int suspectIndex = click.intPart(3);
+        if (!isSuspectIndex(game, suspectIndex)) {
+            click.alert("err.button_invalid");
+            return;
+        }
+        showToGroup(click, game, t -> GameScreens.labChooseCard(t, game, tester.get(), suspectIndex));
+    }
+
+    private void onLabCardChosen(Click click, Game game) {
+        Optional<Player> tester = testerOf(click, game);
+        if (tester.isEmpty()) {
+            return;
+        }
+        int suspectIndex = click.intPart(3);
+        int cardIndex = click.intPart(4);
+        if (!isSuspectIndex(game, suspectIndex) || cardIndex < 0 || cardIndex >= 2 * CardDeck.CARDS_PER_TYPE) {
+            click.alert("err.button_invalid");
+            return;
+        }
+
+        Player owner = game.getSuspects().get(suspectIndex);
+        Hand hand = game.getHands().get(owner);
+        List<Card> cards = new ArrayList<>(hand.weapons());
+        cards.addAll(hand.evidence());
+        Card card = cards.get(cardIndex);
+
+        if (game.findLabResult(card).isPresent()) {
+            click.alert("err.lab.tested", Texts.cardMsg(card));
+            return;
+        }
+        LabResult result = game.testCard(tester.get().userId(), owner, card);
+        showToGroup(click, game, t -> GameScreens.labResult(t, game, result));
+    }
+
+    private void onLabCancelled(Click click, Game game) {
+        long testerId = click.longPart(2);
+        Optional<Player> tester = game.getPlayer(testerId);
+        if (tester.isEmpty() || testerId != click.userId()) {
+            click.alert("err.lab.belongs", ownerName(tester));
+            return;
+        }
+        showToGroup(click, game, t -> GameScreens.labCancelled(t, tester.get()));
     }
 
     // ---------------------------------------------------------------- Accusation
@@ -292,37 +483,35 @@ public class GameController {
     public void accuseByCommand(long groupChatId, User user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
-            messenger.send(groupChatId, noCaseHere());
+            sendNoCaseHere(groupChatId, user);
             return;
         }
-        startAccusation(game.get(), user)
-                .ifPresent(problem -> messenger.send(groupChatId,
-                        Screen.text(Theme.ICON_WRONG + " " + Theme.esc(problem))));
+        startAccusation(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
-    private Optional<String> startAccusation(Game game, User user) {
-        Optional<String> problem = whyCannotAccuse(game, user.getId());
+    private Optional<Msg> startAccusation(Game game, User user) {
+        Optional<Msg> problem = whyCannotAccuse(game, user.getId());
         if (problem.isPresent()) {
             return problem;
         }
         Player accuser = game.getPlayer(user.getId()).orElseThrow();
-        messenger.send(game.getRoom().groupChatId(), GameScreens.accuseChooseSuspect(game, accuser));
+        sendToGroup(game, t -> GameScreens.accuseChooseSuspect(t, game, accuser));
         return Optional.empty();
     }
 
-    private Optional<String> whyCannotAccuse(Game game, long userId) {
+    private Optional<Msg> whyCannotAccuse(Game game, long userId) {
         Optional<Role> role = game.getRole(userId);
         if (role.isEmpty()) {
-            return Optional.of("You are not part of this case.");
+            return Optional.of(Msg.of("err.not_in_case"));
         }
         if (role.get() == Role.FORENSIC_SCIENTIST) {
-            return Optional.of("The Forensic Scientist cannot solve the crime. You already know the answer.");
+            return Optional.of(Msg.of("err.accuse.scientist"));
         }
-        if (!game.hasSolution()) {
-            return Optional.of("The crime has not been committed yet. Wait for the murderer's choice.");
+        if (!game.isCrimeSealed()) {
+            return Optional.of(Msg.of("err.accuse.not_sealed"));
         }
         if (game.hasAccused(userId)) {
-            return Optional.of("You have already used your attempt to solve the crime.");
+            return Optional.of(Msg.of("err.accuse.used"));
         }
         return Optional.empty();
     }
@@ -332,10 +521,10 @@ public class GameController {
         long accuserId = click.longPart(2);
         Optional<Player> accuser = game.getPlayer(accuserId);
         if (accuser.isEmpty() || accuserId != click.userId()) {
-            click.alert("This accusation belongs to " + accuser.map(Player::name).orElse("someone else") + ".");
+            click.alert("err.accuse.belongs", ownerName(accuser));
             return Optional.empty();
         }
-        Optional<String> problem = whyCannotAccuse(game, accuserId);
+        Optional<Msg> problem = whyCannotAccuse(game, accuserId);
         if (problem.isPresent()) {
             click.alert(problem.get());
             return Optional.empty();
@@ -350,21 +539,21 @@ public class GameController {
         }
         int suspectIndex = click.intPart(3);
         if (!isSuspectIndex(game, suspectIndex)) {
-            click.alert("This button is no longer valid.");
+            click.alert("err.button_invalid");
             return;
         }
 
         if (click.part(0).equals(Callbacks.ACCUSE_SUSPECT)) {
-            messenger.show(click.message(), GameScreens.accuseChooseMeans(game, accuser.get(), suspectIndex));
+            showToGroup(click, game, t -> GameScreens.accuseChooseMeans(t, game, accuser.get(), suspectIndex));
             return;
         }
         int weaponIndex = click.intPart(4);
         if (!isCardIndex(weaponIndex)) {
-            click.alert("This button is no longer valid.");
+            click.alert("err.button_invalid");
             return;
         }
-        messenger.show(click.message(),
-                GameScreens.accuseChooseKeyEvidence(game, accuser.get(), suspectIndex, weaponIndex));
+        showToGroup(click, game,
+                t -> GameScreens.accuseChooseKeyEvidence(t, game, accuser.get(), suspectIndex, weaponIndex));
     }
 
     private void onAccusationFinished(Click click, Game game) {
@@ -376,7 +565,7 @@ public class GameController {
         int weaponIndex = click.intPart(4);
         int evidenceIndex = click.intPart(5);
         if (!isSuspectIndex(game, suspectIndex) || !isCardIndex(weaponIndex) || !isCardIndex(evidenceIndex)) {
-            click.alert("This button is no longer valid.");
+            click.alert("err.button_invalid");
             return;
         }
 
@@ -386,16 +575,22 @@ public class GameController {
         Card weapon = hand.weapons().get(weaponIndex);
         Card evidence = hand.evidence().get(evidenceIndex);
 
-        boolean correct = game.accuse(accuser.userId(), suspect, weapon, evidence);
+        AccusationResult result = game.accuse(accuser.userId(), suspect, weapon, evidence);
 
-        if (correct) {
-            messenger.show(click.message(), GameScreens.accusationFinal(accuser, suspect, weapon, evidence, true));
+        if (result == AccusationResult.SOLVED) {
+            showToGroup(click, game,
+                    t -> GameScreens.accusationFinal(t, accuser, suspect, weapon, evidence, true));
             closeCase(game, true, accuser, null);
+        } else if (result == AccusationResult.WRONGFUL_CONVICTION) {
+            showToGroup(click, game,
+                    t -> GameScreens.accusationOfScapegoat(t, accuser, suspect, weapon, evidence));
+            closeCase(game, false, null, Msg.of("verdict.reason.framed", suspect.name()));
         } else if (game.allInvestigatorsDone()) {
-            messenger.show(click.message(), GameScreens.accusationFinal(accuser, suspect, weapon, evidence, false));
-            closeCase(game, false, null, "Every investigator has used their attempt.");
+            showToGroup(click, game,
+                    t -> GameScreens.accusationFinal(t, accuser, suspect, weapon, evidence, false));
+            closeCase(game, false, null, Msg.of("verdict.reason.attempts"));
         } else {
-            messenger.show(click.message(), GameScreens.accusationWrong(accuser, suspect, weapon, evidence));
+            showToGroup(click, game, t -> GameScreens.accusationWrong(t, accuser, suspect, weapon, evidence));
         }
     }
 
@@ -403,10 +598,10 @@ public class GameController {
         long accuserId = click.longPart(2);
         Optional<Player> accuser = game.getPlayer(accuserId);
         if (accuser.isEmpty() || accuserId != click.userId()) {
-            click.alert("This accusation belongs to " + accuser.map(Player::name).orElse("someone else") + ".");
+            click.alert("err.accuse.belongs", ownerName(accuser));
             return;
         }
-        messenger.show(click.message(), GameScreens.accusationWithdrawn(accuser.get()));
+        showToGroup(click, game, t -> GameScreens.accusationWithdrawn(t, accuser.get()));
     }
 
     private boolean isSuspectIndex(Game game, int index) {
@@ -416,13 +611,12 @@ public class GameController {
     // ---------------------------------------------------------------- Ending the case
 
     /** Publishes the verdict, counts the result and frees the group for a new room. */
-    private void closeCase(Game game, boolean investigatorsWon, Player solver, String reasonIfUnsolved) {
-        long chatId = game.getRoom().groupChatId();
-        messenger.send(chatId, investigatorsWon
-                ? GameScreens.caseSolved(game, solver)
-                : GameScreens.murdererEscaped(game, reasonIfUnsolved));
+    private void closeCase(Game game, boolean investigatorsWon, Player solver, Msg reasonIfUnsolved) {
+        sendToGroup(game, t -> investigatorsWon
+                ? GameScreens.caseSolved(t, game, solver)
+                : GameScreens.murdererEscaped(t, game, reasonIfUnsolved));
         statsService.recordGame(game, investigatorsWon, solver == null ? null : solver.userId());
-        gameService.endGame(chatId);
+        gameService.endGame(game.getRoom().groupChatId());
     }
 
     /**
@@ -437,12 +631,11 @@ public class GameController {
         }
         Game game = gameOpt.get();
         if (!game.getRoom().isHost(user.getId()) && game.getPlayer(user.getId()).isEmpty()) {
-            messenger.send(groupChatId, Screen.text(Theme.ICON_WRONG
-                    + " Only the host or a player of this case can end it."));
+            sendProblem(groupChatId, user, Msg.of("err.end.not_allowed"));
             return true;
         }
         gameService.endGame(groupChatId);
-        messenger.send(groupChatId, GameScreens.caseAbandoned(game, user.getFirstName()));
+        sendToGroup(game, t -> GameScreens.caseAbandoned(t, game, user.getFirstName()));
         return true;
     }
 
@@ -450,34 +643,57 @@ public class GameController {
     public Optional<Screen> caseFile(String code, long userId) {
         return gameService.findByCode(code)
                 .filter(game -> game.getPlayer(userId).isPresent())
-                .map(game -> GameScreens.caseFile(game, userId));
+                .map(game -> localizer.forUser(userId, t -> GameScreens.caseFile(t, game, userId)));
     }
 
-    // ---------------------------------------------------------------- Helpers
+    // ---------------------------------------------------------------- Who sees what, in which language
 
-    private Screen noCaseHere() {
-        return Screen.text(Theme.ICON_ROOMS + " There is no running case in this group. Send /newgame to create a room.");
+    /** A new message in the group, written for all players of the case. */
+    private void sendToGroup(Game game, Function<Texts, Screen> view) {
+        messenger.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
-    private boolean isTestPlayer(Player player) {
-        return player.userId() < 0;
+    /** Changes the group message a button belongs to, written for all players of the case. */
+    private void showToGroup(Click click, Game game, Function<Texts, Screen> view) {
+        messenger.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
-    private void sendPrivately(Player player, Screen screen) {
+    /** Changes the private message a button belongs to, in the language of the player who pressed it. */
+    private void showToClicker(Click click, Function<Texts, Screen> view) {
+        messenger.show(click.message(), view.apply(click.texts()));
+    }
+
+    private void sendPrivately(Player player, Function<Texts, Screen> view) {
         if (!isTestPlayer(player)) {
-            messenger.send(player.userId(), screen);
+            messenger.send(player.userId(), localizer.forUser(player.userId(), view));
         }
     }
 
     /** Shows a screen in the player's private chat, reusing their last message if there is one. */
-    private void presentPrivately(Player player, MessageRef inPlace, Screen screen) {
+    private void presentPrivately(Player player, MessageRef inPlace, Function<Texts, Screen> view) {
         if (isTestPlayer(player)) {
             return;
         }
+        Screen screen = localizer.forUser(player.userId(), view);
         if (inPlace != null && inPlace.chatId() == player.userId()) {
             messenger.show(inPlace, screen);
         } else {
             messenger.send(player.userId(), screen);
         }
+    }
+
+    /** Answers a command that could not be carried out, in the language of the player who sent it. */
+    private void sendProblem(long groupChatId, User user, Msg problem) {
+        messenger.send(groupChatId,
+                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));
+    }
+
+    private void sendNoCaseHere(long groupChatId, User user) {
+        messenger.send(groupChatId,
+                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("err.no_case"))));
+    }
+
+    private boolean isTestPlayer(Player player) {
+        return player.userId() < 0;
     }
 }

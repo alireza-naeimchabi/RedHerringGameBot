@@ -1,5 +1,8 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.i18n.Language;
+import de.winona.telegrambot.i18n.Msg;
+import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.PlayerStats;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
@@ -11,14 +14,16 @@ import de.winona.telegrambot.util.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The private dashboard: home, rooms, rules, roles, statistics, leaderboard and profile.
- * It reads data from the services and lets {@link MenuScreens} turn it into screens.
+ * The private dashboard: home, rooms, rules, roles, statistics, leaderboard, profile and language.
+ * It reads data from the services and lets {@link MenuScreens} turn it into screens,
+ * always in the language of the player it is talking to.
  */
 public class MenuController {
 
@@ -26,6 +31,7 @@ public class MenuController {
     private static final String START_HOW_TO_PLAY = "how";
 
     private final Messenger messenger;
+    private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
     private final StatsService statsService;
@@ -34,10 +40,11 @@ public class MenuController {
     /** Players who tapped "Join Game Room" and are expected to send a code next. */
     private final Set<Long> waitingForCode = new HashSet<>();
 
-    public MenuController(Messenger messenger, LobbyService lobbyService, GameService gameService,
-                          StatsService statsService, RoomController roomController,
+    public MenuController(Messenger messenger, Localizer localizer, LobbyService lobbyService,
+                          GameService gameService, StatsService statsService, RoomController roomController,
                           GameController gameController) {
         this.messenger = messenger;
+        this.localizer = localizer;
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.statsService = statsService;
@@ -50,11 +57,12 @@ public class MenuController {
     /** Handles a command in the private chat. Returns false if the command is unknown. */
     public boolean onCommand(String command, String argument, User user) {
         waitingForCode.remove(user.getId());
+        Texts t = localizer.textsFor(user.getId());
         switch (command) {
             case "/start" -> onStart(argument, user);
-            case "/menu", "/home" -> send(user, home(user));
-            case "/rooms", "/room" -> send(user, MenuScreens.rooms(roomsOf(user.getId())));
-            case "/newgame" -> send(user, MenuScreens.createRoom(messenger.botUsername()));
+            case "/menu", "/home" -> send(user, home(t, user));
+            case "/rooms", "/room" -> send(user, MenuScreens.rooms(t, roomsOf(user.getId())));
+            case "/newgame" -> send(user, MenuScreens.createRoom(t, messenger.botUsername()));
             case "/join" -> {
                 if (argument.isBlank()) {
                     askForCode(user, null);
@@ -62,11 +70,12 @@ public class MenuController {
                     joinWithCode(user, argument, null);
                 }
             }
-            case "/help", "/howtoplay" -> send(user, MenuScreens.howToPlay(1));
-            case "/roles" -> send(user, MenuScreens.roles(1));
-            case "/stats" -> send(user, statistics(user));
-            case "/leaderboard" -> send(user, leaderboard(user));
-            case "/profile" -> send(user, profile(user));
+            case "/help", "/howtoplay" -> send(user, MenuScreens.howToPlay(t, 1));
+            case "/roles" -> send(user, MenuScreens.roles(t, 1));
+            case "/stats" -> send(user, statistics(t, user));
+            case "/leaderboard" -> send(user, leaderboard(t, user));
+            case "/profile" -> send(user, profile(t, user));
+            case "/language", "/lang" -> send(user, MenuScreens.language(t));
             default -> {
                 return false;
             }
@@ -75,26 +84,27 @@ public class MenuController {
     }
 
     private void onStart(String parameter, User user) {
+        Texts t = localizer.textsFor(user.getId());
         if (parameter.startsWith(START_JOIN_PREFIX)) {
             joinWithCode(user, parameter.substring(START_JOIN_PREFIX.length()), null);
         } else if (parameter.equals(START_HOW_TO_PLAY)) {
-            send(user, MenuScreens.howToPlay(1));
+            send(user, MenuScreens.howToPlay(t, 1));
         } else {
-            send(user, home(user));
+            send(user, home(t, user));
         }
     }
 
     /** Handles plain text in the private chat: a room code, if one is expected or it looks like one. */
     public void onText(String text, User user) {
+        Texts t = localizer.textsFor(user.getId());
         boolean expected = waitingForCode.contains(user.getId());
         if (RoomCodeGenerator.looksLikeCode(text)) {
             joinWithCode(user, text, null);
         } else if (expected) {
-            send(user, MenuScreens.joinFailed(MenuScreens.shorten(text, 12),
-                    "A room code has " + RoomCodeGenerator.CODE_LENGTH
-                            + " letters or digits, for example K7Q2. Send the code again."));
+            send(user, MenuScreens.joinFailed(t, t.shorten(text, 12),
+                    Msg.of("join.bad_code", RoomCodeGenerator.CODE_LENGTH)));
         } else {
-            send(user, home(user));
+            send(user, home(t, user));
         }
     }
 
@@ -102,29 +112,32 @@ public class MenuController {
 
     public void onClick(Click click) {
         if (!click.inPrivateChat()) {
-            click.alert("Open the dashboard in our private chat.");
+            click.alert("err.dashboard_private");
             return;
         }
         User user = click.user();
+        Texts t = click.texts();
         String action = click.part(1);
         if (!action.equals("join")) {
             waitingForCode.remove(user.getId());
         }
 
         switch (action) {
-            case "home" -> show(click, home(user));
-            case "rooms" -> show(click, MenuScreens.rooms(roomsOf(user.getId())));
-            case "create" -> show(click, MenuScreens.createRoom(messenger.botUsername()));
+            case "home" -> show(click, home(t, user));
+            case "rooms" -> show(click, MenuScreens.rooms(t, roomsOf(user.getId())));
+            case "create" -> show(click, MenuScreens.createRoom(t, messenger.botUsername()));
             case "join" -> askForCode(user, click);
-            case "how" -> show(click, MenuScreens.howToPlay(pageOf(click)));
-            case "roles" -> show(click, MenuScreens.roles(pageOf(click)));
-            case "stats" -> show(click, statistics(user));
-            case "top" -> show(click, leaderboard(user));
-            case "me" -> show(click, profile(user));
+            case "how" -> show(click, MenuScreens.howToPlay(t, pageOf(click)));
+            case "roles" -> show(click, MenuScreens.roles(t, pageOf(click)));
+            case "stats" -> show(click, statistics(t, user));
+            case "top" -> show(click, leaderboard(t, user));
+            case "me" -> show(click, profile(t, user));
+            case "lang" -> show(click, MenuScreens.language(t));
+            case "setlang" -> setLanguage(click, click.part(2));
             case "room" -> showRoom(click, click.part(2));
             case "case" -> showCaseFile(click, click.part(2));
             case "noop" -> click.finish();
-            default -> click.alert("This button is no longer valid.");
+            default -> click.alert("err.button_invalid");
         }
     }
 
@@ -136,21 +149,37 @@ public class MenuController {
         }
     }
 
+    /** Stores the chosen language and shows the dashboard in it right away. */
+    private void setLanguage(Click click, String languageCode) {
+        Optional<Language> chosen = Arrays.stream(Language.values())
+                .filter(language -> language.code().equals(languageCode))
+                .findFirst();
+        if (chosen.isEmpty()) {
+            click.alert("err.button_invalid");
+            return;
+        }
+        localizer.setLanguage(click.userId(), chosen.get());
+        Texts t = localizer.textsFor(click.userId());
+        // The confirmation is already written in the new language.
+        click.toastText(t.get("lang.changed"));
+        show(click, home(t, click.user()));
+    }
+
     private void showRoom(Click click, String code) {
         Optional<RoomSummary> room = findRoom(code);
         if (room.isEmpty()) {
-            click.alert("Room " + code + " is no longer open.");
-            show(click, MenuScreens.rooms(roomsOf(click.userId())));
+            click.alert("err.room_closed_code", code);
+            show(click, MenuScreens.rooms(click.texts(), roomsOf(click.userId())));
             return;
         }
-        show(click, MenuScreens.roomDetails(room.get(), click.userId()));
+        show(click, MenuScreens.roomDetails(click.texts(), room.get(), click.userId()));
     }
 
     private void showCaseFile(Click click, String code) {
         Optional<Screen> caseFile = gameController.caseFile(code, click.userId());
         if (caseFile.isEmpty()) {
-            click.alert("Case " + code + " is closed.");
-            show(click, MenuScreens.rooms(roomsOf(click.userId())));
+            click.alert("err.case_closed_code", code);
+            show(click, MenuScreens.rooms(click.texts(), roomsOf(click.userId())));
             return;
         }
         show(click, caseFile.get());
@@ -160,14 +189,16 @@ public class MenuController {
 
     private void askForCode(User user, Click click) {
         waitingForCode.add(user.getId());
+        Screen prompt = MenuScreens.joinPrompt(localizer.textsFor(user.getId()));
         if (click == null) {
-            send(user, MenuScreens.joinPrompt());
+            send(user, prompt);
         } else {
-            show(click, MenuScreens.joinPrompt());
+            show(click, prompt);
         }
     }
 
     private void joinWithCode(User user, String rawCode, Click click) {
+        Texts t = localizer.textsFor(user.getId());
         String code = RoomCodeGenerator.normalize(rawCode);
         JoinOutcome outcome = roomController.join(code, user, false);
 
@@ -175,13 +206,13 @@ public class MenuController {
         if (outcome.seated()) {
             waitingForCode.remove(user.getId());
             screen = findRoom(code)
-                    .map(room -> MenuScreens.roomDetails(room, user.getId()))
-                    .orElseGet(() -> home(user));
+                    .map(room -> MenuScreens.roomDetails(t, room, user.getId()))
+                    .orElseGet(() -> home(t, user));
         } else if (outcome == JoinOutcome.IN_PROGRESS && gameController.caseFile(code, user.getId()).isPresent()) {
             waitingForCode.remove(user.getId());
             screen = gameController.caseFile(code, user.getId()).get();
         } else {
-            screen = MenuScreens.joinFailed(MenuScreens.shorten(code, 12), outcome.message(code));
+            screen = MenuScreens.joinFailed(t, t.shorten(code, 12), outcome.message(code));
         }
 
         if (click == null) {
@@ -193,25 +224,25 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Data for the screens
 
-    private Screen home(User user) {
-        return MenuScreens.home(user.getFirstName(), roomsOf(user.getId()), statsService.statsOf(user.getId()));
+    private Screen home(Texts t, User user) {
+        return MenuScreens.home(t, user.getFirstName(), roomsOf(user.getId()), statsService.statsOf(user.getId()));
     }
 
-    private Screen statistics(User user) {
-        return MenuScreens.statistics(statsService.statsOf(user.getId()), statsService.rankOf(user.getId()));
+    private Screen statistics(Texts t, User user) {
+        return MenuScreens.statistics(t, statsService.statsOf(user.getId()), statsService.rankOf(user.getId()));
     }
 
-    private Screen leaderboard(User user) {
-        return MenuScreens.leaderboard(statsService.leaderboard(MenuScreens.LEADERBOARD_SIZE),
+    private Screen leaderboard(Texts t, User user) {
+        return MenuScreens.leaderboard(t, statsService.leaderboard(MenuScreens.LEADERBOARD_SIZE),
                 user.getId(), statsService.rankOf(user.getId()));
     }
 
-    private Screen profile(User user) {
+    private Screen profile(Texts t, User user) {
         String fullName = user.getLastName() == null || user.getLastName().isBlank()
                 ? user.getFirstName()
                 : user.getFirstName() + " " + user.getLastName();
         Optional<PlayerStats> stats = statsService.statsOf(user.getId());
-        return MenuScreens.profile(fullName, user.getUserName(), user.getId(), stats,
+        return MenuScreens.profile(t, fullName, user.getUserName(), user.getId(), stats,
                 statsService.rankOf(user.getId()), roomsOf(user.getId()).size());
     }
 

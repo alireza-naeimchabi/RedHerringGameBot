@@ -1,13 +1,19 @@
 package de.winona.telegrambot.ui;
 
+import de.winona.telegrambot.i18n.Language;
+import de.winona.telegrambot.i18n.Msg;
+import de.winona.telegrambot.i18n.Texts;
+import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Lobby;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.PlayerStats;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.IntFunction;
 
 import static de.winona.telegrambot.ui.Keyboard.button;
 import static de.winona.telegrambot.ui.Keyboard.link;
@@ -20,425 +26,432 @@ import static de.winona.telegrambot.ui.Theme.note;
 
 /**
  * The screens of the private dashboard. Every method only turns data into a {@link Screen};
- * nothing here talks to Telegram or changes the game.
+ * nothing here talks to Telegram or changes the game. The first parameter is always the
+ * {@link Texts} of the reader's language, and every word comes from there.
  */
 public final class MenuScreens {
 
-    public static final int HOW_TO_PLAY_PAGES = 4;
+    public static final int HOW_TO_PLAY_PAGES = 5;
     public static final int ROLE_PAGES = 5;
     public static final int LEADERBOARD_SIZE = 10;
 
     private static final int MAX_ROOMS_SHOWN = 4;
     private static final int MAX_NAME_LENGTH = 22;
     private static final int MAX_GROUP_TITLE_LENGTH = 32;
+    private static final String[] ROLE_KEYS = {"scientist", "murderer", "investigator", "accomplice", "witness"};
 
     private MenuScreens() {
     }
 
     // ---------------------------------------------------------------- Home
 
-    public static Screen home(String firstName, List<RoomSummary> rooms, Optional<PlayerStats> stats) {
-        String rank = Theme.rankTitle(stats.map(PlayerStats::getWins).orElse(0));
+    public static Screen home(Texts t, String firstName, List<RoomSummary> rooms, Optional<PlayerStats> stats) {
+        String rank = t.rank(stats.map(PlayerStats::getWins).orElse(0));
 
         StringBuilder text = new StringBuilder();
-        text.append(bold(Theme.HEADLINE)).append("\n\n");
-        text.append(esc(Theme.TAGLINE)).append("\n\n");
-        text.append(note(rank + " " + bold(shorten(firstName, MAX_NAME_LENGTH)) + "\n" + statusLine(rooms)));
+        text.append(bold(t.get("brand.headline"))).append("\n\n");
+        text.append(esc(t.get("brand.tagline"))).append("\n\n");
+        text.append(note(t.get("home.rank_line", rank, t.name(firstName, MAX_NAME_LENGTH))
+                + "\n" + statusLine(t, rooms)));
 
         Keyboard keyboard = Keyboard.create()
-                .row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.CREATE_ROOM))
-                .row(button(Theme.ICON_JOIN + " Join Game Room", Callbacks.JOIN_ROOM))
-                .row(button(Theme.ICON_HOW_TO + " How to Play", Callbacks.howToPlay(1)),
-                        button(Theme.ICON_ROLES + " Game Roles", Callbacks.roles(1)))
-                .row(button(Theme.ICON_STATS + " My Statistics", Callbacks.STATISTICS));
+                .row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.CREATE_ROOM))
+                .row(button(Theme.ICON_JOIN + " " + t.get("btn.join_game_room"), Callbacks.JOIN_ROOM))
+                .row(button(Theme.ICON_HOW_TO + " " + t.get("btn.how_to_play"), Callbacks.howToPlay(1)),
+                        button(Theme.ICON_ROLES + " " + t.get("btn.game_roles"), Callbacks.roles(1)))
+                .row(button(Theme.ICON_STATS + " " + t.get("btn.my_statistics"), Callbacks.STATISTICS),
+                        languageButton());
 
-        return Screen.withBanner(Banner.HOME, text.toString(), withNavigation(keyboard).build());
+        return t.banner(Banner.HOME, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    private static String statusLine(List<RoomSummary> rooms) {
+    private static String statusLine(Texts t, List<RoomSummary> rooms) {
         if (rooms.isEmpty()) {
-            return "No open cases. Create a room to start one.";
+            return t.get("home.status.none");
         }
         RoomSummary first = rooms.get(0);
         String line = first.inProgress()
-                ? Theme.ICON_LIVE + " Case " + code(first.code()) + " is underway, round "
-                        + first.round() + " of 3."
-                : Theme.ICON_WAITING + " Room " + code(first.code()) + " is waiting for detectives, "
-                        + first.players().size() + " of " + Lobby.MAX_PLAYERS + " seated.";
+                ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), Game.MAX_ROUNDS)
+                : Theme.ICON_WAITING + " " + t.get("home.status.room", first.code(),
+                        first.players().size(), Lobby.MAX_PLAYERS);
         if (rooms.size() > 1) {
-            line += "\n+ " + Theme.plural(rooms.size() - 1, "more room", "more rooms") + " in My Game Rooms.";
+            line += "\n" + t.plural("home.status.more", rooms.size() - 1);
         }
         return line;
     }
 
+    // ---------------------------------------------------------------- Language
+
+    /** The button is written in every language, so it can be found without reading the current one. */
+    private static InlineKeyboardButton languageButton() {
+        StringBuilder label = new StringBuilder(Theme.ICON_LANGUAGE);
+        for (Language language : Language.values()) {
+            label.append(label.length() > Theme.ICON_LANGUAGE.length() ? " · " : " ")
+                    .append(Texts.of(language).get("btn.language"));
+        }
+        return button(label.toString(), Callbacks.LANGUAGE);
+    }
+
+    public static Screen language(Texts t) {
+        StringBuilder text = new StringBuilder();
+        text.append(heading(Theme.ICON_LANGUAGE, t.get("lang.title"), t.get("lang.sub"))).append("\n\n");
+        text.append(t.get("lang.current", bold(t.language().flag() + " " + t.language().nativeName())))
+                .append("\n\n");
+        text.append(t.get("lang.body"));
+
+        Keyboard keyboard = Keyboard.create();
+        List<InlineKeyboardButton> choices = new ArrayList<>();
+        for (Language language : Language.values()) {
+            String mark = language == t.language() ? " ✓" : "";
+            choices.add(button(language.flag() + " " + language.nativeName() + mark,
+                    Callbacks.setLanguage(language.code())));
+        }
+        keyboard.grid(choices, 2);
+        return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
+    }
+
     // ---------------------------------------------------------------- Game rooms
 
-    public static Screen rooms(List<RoomSummary> rooms) {
+    public static Screen rooms(Texts t, List<RoomSummary> rooms) {
         StringBuilder text = new StringBuilder();
         Keyboard keyboard = Keyboard.create();
 
         if (rooms.isEmpty()) {
-            text.append(heading(Theme.ICON_ROOMS, "MY GAME ROOMS", "No open cases")).append("\n\n");
-            text.append("You are not seated in any room right now.\n\n");
-            text.append("Create a room for your group, or join a friend's room with its code.");
+            text.append(heading(Theme.ICON_ROOMS, t.get("rooms.title"), t.get("rooms.none.sub"))).append("\n\n");
+            text.append(t.get("rooms.none.body"));
         } else {
-            text.append(heading(Theme.ICON_ROOMS, "MY GAME ROOMS",
-                    Theme.plural(rooms.size(), "room", "rooms"))).append("\n");
+            text.append(heading(Theme.ICON_ROOMS, t.get("rooms.title"),
+                    t.plural("rooms.count", rooms.size()))).append("\n");
             for (RoomSummary room : rooms.stream().limit(MAX_ROOMS_SHOWN).toList()) {
-                text.append("\n").append(roomCard(room)).append("\n");
+                text.append("\n").append(roomCard(t, room)).append("\n");
                 keyboard.row(room.inProgress()
-                        ? button("Rejoin Game " + room.code(), Callbacks.caseFile(room.code()))
-                        : button("Enter Room " + room.code(), Callbacks.roomDetails(room.code())));
+                        ? button(t.get("btn.rejoin_code", room.code()), Callbacks.caseFile(room.code()))
+                        : button(t.get("btn.enter_room_code", room.code()), Callbacks.roomDetails(room.code())));
             }
             if (rooms.size() > MAX_ROOMS_SHOWN) {
-                text.append("\n").append(italic("Showing your " + MAX_ROOMS_SHOWN + " most recent rooms."));
+                text.append("\n").append(italic(t.get("rooms.showing", MAX_ROOMS_SHOWN)));
             }
         }
 
-        keyboard.row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.CREATE_ROOM),
-                button(Theme.ICON_JOIN + " Join Game Room", Callbacks.JOIN_ROOM));
-        return Screen.withBanner(Banner.ROOMS, text.toString(), withNavigation(keyboard).build());
+        keyboard.row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.CREATE_ROOM),
+                button(Theme.ICON_JOIN + " " + t.get("btn.join_game_room"), Callbacks.JOIN_ROOM));
+        return t.banner(Banner.ROOMS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    private static String roomCard(RoomSummary room) {
+    private static String roomCard(Texts t, RoomSummary room) {
         String status = room.inProgress()
-                ? Theme.ICON_LIVE + " " + bold("Room " + room.code()) + "  Case underway, round " + room.round()
-                : Theme.ICON_WAITING + " " + bold("Room " + room.code()) + "  Waiting for detectives";
+                ? Theme.ICON_LIVE + " " + t.get("room.card.live", room.code(), room.round())
+                : Theme.ICON_WAITING + " " + t.get("room.card.waiting", room.code());
         return status + "\n"
-                + italic(shorten(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH)) + "\n"
-                + seatsLine(room) + "\n"
+                + italic(t.plainName(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH)) + "\n"
+                + seatsLine(t, room) + "\n"
                 + Theme.initials(room.playerNames()) + "\n"
-                + "Host: " + esc(shorten(room.room().host().name(), MAX_NAME_LENGTH));
+                + t.get("room.host", t.name(room.room().host().name(), MAX_NAME_LENGTH));
     }
 
-    private static String seatsLine(RoomSummary room) {
+    private static String seatsLine(Texts t, RoomSummary room) {
         int capacity = room.inProgress() ? room.players().size() : Lobby.MAX_PLAYERS;
         return Theme.seats(room.players().size(), capacity) + "  "
-                + room.players().size() + " of " + capacity + " seated";
+                + t.get("room.seats", room.players().size(), capacity);
     }
 
-    public static Screen roomDetails(RoomSummary room, long viewerId) {
+    public static Screen roomDetails(Texts t, RoomSummary room, long viewerId) {
         boolean host = room.room().isHost(viewerId);
         boolean seated = room.hasPlayer(viewerId);
 
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_ROOMS, "ROOM " + room.code(),
-                shorten(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH))).append("\n\n");
+        text.append(heading(Theme.ICON_ROOMS, t.get("room.title", room.code()),
+                t.plainName(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH))).append("\n\n");
         text.append(room.inProgress()
-                ? Theme.ICON_LIVE + " Case underway, round " + room.round() + " of 3"
-                : Theme.ICON_WAITING + " Waiting for detectives").append("\n");
-        text.append(seatsLine(room)).append("\n\n");
-        text.append(playerList(room.players(), room)).append("\n");
+                ? Theme.ICON_LIVE + " " + t.get("room.status.live", room.round(), Game.MAX_ROUNDS)
+                : Theme.ICON_WAITING + " " + t.get("room.status.waiting")).append("\n");
+        text.append(seatsLine(t, room)).append("\n\n");
+        text.append(playerList(t, room.players(), room)).append("\n");
 
         Keyboard keyboard = Keyboard.create();
         if (room.inProgress()) {
-            text.append(note("The case is being investigated in the group chat. "
-                    + "Open your case file to see your role and the scene report."));
+            text.append(note(t.get("room.note.live")));
             if (seated) {
-                keyboard.row(button("Rejoin Game", Callbacks.caseFile(room.code())));
+                keyboard.row(button(t.get("btn.rejoin"), Callbacks.caseFile(room.code())));
             }
         } else {
             int missing = Math.max(0, Lobby.MIN_PLAYERS - room.players().size());
             text.append(note(missing > 0
-                    ? "Needs " + Theme.plural(missing, "more detective", "more detectives")
-                            + " before the case can open."
-                    : "Ready. The host can open the case."));
+                    ? t.plural("room.note.missing", missing)
+                    : t.get("room.note.ready")));
             if (host) {
-                keyboard.row(button("▶️ Open the Case", Callbacks.startRoom(room.code())));
+                keyboard.row(button("▶️ " + t.get("btn.open_case"), Callbacks.startRoom(room.code())));
             }
             InlineKeyboardButton seat = seated
-                    ? button("Leave Room", Callbacks.leaveRoom(room.code()))
-                    : button(Theme.ICON_JOIN + " Join Room", Callbacks.joinRoom(room.code()));
+                    ? button(t.get("btn.leave_room"), Callbacks.leaveRoom(room.code()))
+                    : button(Theme.ICON_JOIN + " " + t.get("btn.join_room"), Callbacks.joinRoom(room.code()));
             if (host) {
-                keyboard.row(seat, button("Close Room", Callbacks.closeRoom(room.code())));
+                keyboard.row(seat, button(t.get("btn.close_room"), Callbacks.closeRoom(room.code())));
             } else {
                 keyboard.row(seat);
             }
         }
-        keyboard.row(button("↻ Refresh", Callbacks.roomDetails(room.code())),
-                button("◀ My Game Rooms", Callbacks.ROOMS));
-        return Screen.withBanner(Banner.ROOMS, text.toString(), withNavigation(keyboard).build());
+        keyboard.row(button("↻ " + t.get("btn.refresh"), Callbacks.roomDetails(room.code())),
+                button("◀ " + t.get("btn.my_game_rooms"), Callbacks.ROOMS));
+        return t.banner(Banner.ROOMS, text.toString(), withNavigation(t, keyboard).build());
     }
 
     /** Numbered list of the players in a room, with the host marked. */
-    public static String playerList(List<Player> players, RoomSummary room) {
+    public static String playerList(Texts t, List<Player> players, RoomSummary room) {
         if (players.isEmpty()) {
-            return italic("No one is seated yet.") + "\n";
+            return italic(t.get("room.nobody")) + "\n";
         }
         StringBuilder list = new StringBuilder();
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
-            list.append(i + 1).append(". ").append(esc(shorten(player.name(), MAX_NAME_LENGTH)));
+            list.append(t.number(i + 1)).append(". ").append(t.name(player.name(), MAX_NAME_LENGTH));
             if (room.room().isHost(player.userId())) {
-                list.append("  ").append(italic("host"));
+                list.append("  ").append(italic(t.get("room.host_tag")));
             }
             list.append("\n");
         }
         return list.toString();
     }
 
-    public static Screen createRoom(String botUsername) {
+    public static Screen createRoom(Texts t, String botUsername) {
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_CREATE, "CREATE GAME ROOM", "A case needs a group chat")).append("\n\n");
-        text.append("Everyone discusses the evidence together, so a room always lives in a Telegram group.\n\n");
+        text.append(heading(Theme.ICON_CREATE, t.get("create.title"), t.get("create.sub"))).append("\n\n");
+        text.append(t.get("create.body")).append("\n\n");
 
         Keyboard keyboard = Keyboard.create();
         if (botUsername == null || botUsername.isBlank()) {
-            text.append("Add me to your group and send /newgame there. "
-                    + "I post the room card with its code.");
+            text.append(t.get("create.no_link"));
         } else {
-            text.append("1. Tap ").append(bold("Choose a Group")).append(" and pick your group.\n");
-            text.append("2. I open a room there and post its code.\n");
-            text.append("3. Your friends join with one tap.\n\n");
-            text.append(italic("Already in a group with me? Send /newgame there."));
-            keyboard.row(link("➕ Choose a Group", "https://t.me/" + botUsername + "?startgroup=new"));
+            text.append(t.get("create.steps")).append("\n\n");
+            text.append(italic(t.get("create.already")));
+            keyboard.row(link("➕ " + t.get("btn.choose_group"), "https://t.me/" + botUsername + "?startgroup=new"));
         }
-        keyboard.row(button(Theme.ICON_JOIN + " Join Game Room", Callbacks.JOIN_ROOM));
-        return Screen.withBanner(Banner.ROOMS, text.toString(), withNavigation(keyboard).build());
+        keyboard.row(button(Theme.ICON_JOIN + " " + t.get("btn.join_game_room"), Callbacks.JOIN_ROOM));
+        return t.banner(Banner.ROOMS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    public static Screen joinPrompt() {
-        String text = heading(Theme.ICON_JOIN, "JOIN GAME ROOM", "Enter a room code") + "\n\n"
-                + "Send me the 4-character code of the room, for example " + code("K7Q2") + ".\n\n"
-                + "You find the code on the room card in your group chat.";
+    public static Screen joinPrompt(Texts t) {
+        String text = heading(Theme.ICON_JOIN, t.get("join.title"), t.get("join.sub")) + "\n\n"
+                + t.get("join.body", code("K7Q2"));
         Keyboard keyboard = Keyboard.create()
-                .row(button("Cancel", Callbacks.HOME));
-        return Screen.withBanner(Banner.ROOMS, text, keyboard.build());
+                .row(button(t.get("btn.cancel"), Callbacks.HOME));
+        return t.banner(Banner.ROOMS, text, keyboard.build());
     }
 
     /** Shown when a room code cannot be joined. The reason is a full sentence. */
-    public static Screen joinFailed(String code, String reason) {
-        String text = heading(Theme.ICON_JOIN, "JOIN GAME ROOM", "Room " + code) + "\n\n"
-                + Theme.ICON_WRONG + " " + esc(reason);
+    public static Screen joinFailed(Texts t, String code, Msg reason) {
+        String text = heading(Theme.ICON_JOIN, t.get("join.title"), t.get("join.failed.sub", code)) + "\n\n"
+                + Theme.ICON_WRONG + " " + esc(t.get(reason));
         Keyboard keyboard = Keyboard.create()
-                .row(button("Enter Another Code", Callbacks.JOIN_ROOM))
-                .row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.CREATE_ROOM));
-        return Screen.withBanner(Banner.ROOMS, text, withNavigation(keyboard).build());
+                .row(button(t.get("btn.another_code"), Callbacks.JOIN_ROOM))
+                .row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.CREATE_ROOM));
+        return t.banner(Banner.ROOMS, text, withNavigation(t, keyboard).build());
     }
 
     // ---------------------------------------------------------------- How to play
 
-    public static Screen howToPlay(int requestedPage) {
+    public static Screen howToPlay(Texts t, int requestedPage) {
         int page = clamp(requestedPage, HOW_TO_PLAY_PAGES);
-        String body = switch (page) {
-            case 1 -> heading(Theme.ICON_HOW_TO, "HOW TO PLAY", "1. The case") + "\n\n"
-                    + "A murder has been committed, and the murderer is one of the investigators "
-                    + "in your group.\n\n"
-                    + "To solve the case, the investigators must name three things:\n"
-                    + "the " + bold("murderer") + ", the " + bold("Means of Murder")
-                    + " and the " + bold("Key Evidence") + ".\n\n"
-                    + "One case takes 4 to 7 players and about 15 minutes.\n\n"
-                    + italic(Theme.FAN_NOTE);
-            case 2 -> heading(Theme.ICON_HOW_TO, "HOW TO PLAY", "2. Setting the scene") + "\n\n"
-                    + "• Roles are dealt in your private chat with me.\n"
-                    + "• Every player except the Forensic Scientist gets 4 means cards "
-                    + Theme.ICON_MEANS + " and 4 clue cards " + Theme.ICON_CLUE
-                    + ". The Evidence Board shows them to everyone.\n"
-                    + "• The murderer secretly picks one of their own means cards and one of their own "
-                    + "clue cards. This pair is the solution.\n"
-                    + "• The Forensic Scientist learns the solution, but may never talk about it.";
-            case 3 -> heading(Theme.ICON_HOW_TO, "HOW TO PLAY", "3. The investigation") + "\n\n"
-                    + "The Forensic Scientist answers six scene tiles, such as "
-                    + italic("Cause of death") + " or " + italic("Location")
-                    + ", by picking one option on each. Every answer appears in the group at once.\n\n"
-                    + "Discuss what the answers point to. The murderer discusses too, "
-                    + "and steers suspicion towards someone else.\n\n"
-                    + "A case has 3 rounds. In rounds 2 and 3 the Forensic Scientist replaces "
-                    + "one tile with a new one.";
-            default -> heading(Theme.ICON_HOW_TO, "HOW TO PLAY", "4. Solving the crime") + "\n\n"
-                    + "Tap " + bold("Solve the Crime") + " at any time and name a player, "
-                    + "one of their means cards and one of their clue cards.\n\n"
-                    + Theme.ICON_OK + " All three correct: the investigators and the Forensic Scientist win.\n"
-                    + Theme.ICON_WRONG + " Anything wrong: the answer is only \"no\", "
-                    + "and your single attempt is used.\n\n"
-                    + "The murderer wins if round 3 ends without a correct accusation, "
-                    + "or if every investigator has used their attempt.";
-        };
+        String body = heading(Theme.ICON_HOW_TO, t.get("how.title"), t.get("how." + page + ".sub")) + "\n\n"
+                + t.get("how." + page + ".body");
+        if (page == 1) {
+            body += "\n\n" + italic(t.get("brand.fan_note"));
+        }
 
         Keyboard keyboard = Keyboard.create()
-                .row(pager(page, HOW_TO_PLAY_PAGES, Callbacks::howToPlay))
-                .row(button(Theme.ICON_ROLES + " Game Roles", Callbacks.roles(1)));
-        return Screen.withBanner(Banner.BRIEFING, body, withNavigation(keyboard).build());
+                .row(pager(t, page, HOW_TO_PLAY_PAGES, Callbacks::howToPlay))
+                .row(button(Theme.ICON_ROLES + " " + t.get("btn.game_roles"), Callbacks.roles(1)));
+        return t.banner(Banner.BRIEFING, body, withNavigation(t, keyboard).build());
     }
 
     // ---------------------------------------------------------------- Roles
 
-    public static Screen roles(int requestedPage) {
+    public static Screen roles(Texts t, int requestedPage) {
         int page = clamp(requestedPage, ROLE_PAGES);
-        String body = switch (page) {
-            case 1 -> roleCard("FORENSIC SCIENTIST", "Standard role, one per case",
-                    "You know the murderer and the solution, and you lead the investigation "
-                            + "without saying a word about it.",
-                    "Answer the scene tiles so they point to the Means of Murder and the Key Evidence. "
-                            + "Start rounds 2 and 3 and replace one tile each time.",
-                    "Someone solves the crime. You win together with the investigators.");
-            case 2 -> roleCard("MURDERER", "Standard role, one per case",
-                    "You committed the crime and sit among the investigators.",
-                    "Secretly pick one of your means cards and one of your clue cards. "
-                            + "Then join the discussion and shift suspicion to someone else.",
-                    "Nobody names you together with both of your cards.");
-            case 3 -> roleCard("INVESTIGATOR", "Standard role, everyone else",
-                    "You read the scene report and look for the cards it describes.",
-                    "Discuss, defend yourself against false suspicion, and use your single "
-                            + "attempt to solve the crime when you are sure.",
-                    "Any investigator names the murderer, "
-                            + "the Means of Murder and the Key Evidence.");
-            case 4 -> roleCard("ACCOMPLICE", "Optional role in the board game, from 6 players",
-                    "You know the murderer and the solution and help them get away.",
-                    "Protect the murderer in the discussion without exposing yourself.",
-                    "The murderer gets away. You win together.")
-                    + "\n\n" + note("Not part of this bot yet. Cases here use the three standard roles.");
-            default -> roleCard("WITNESS", "Optional role in the board game, with the Accomplice",
-                    "You saw the two culprits leave, but not who of them did it or how.",
-                    "Guide the investigators quietly. If the murderer is caught but can "
-                            + "point you out afterwards, the culprits still escape.",
-                    "The crime is solved and the murderer cannot point you out.")
-                    + "\n\n" + note("Not part of this bot yet. Cases here use the three standard roles.");
-        };
+        String key = "roles." + ROLE_KEYS[page - 1];
+        String body = heading(Theme.ICON_ROLES, t.get(key + ".name"), t.get(key + ".kind")) + "\n\n"
+                + esc(t.get(key + ".who")) + "\n\n"
+                + bold(t.get("roles.job")) + "\n" + esc(t.get(key + ".task")) + "\n\n"
+                + bold(t.get("roles.goal")) + "\n" + esc(t.get(key + ".goal"));
+        if (page > 3) {
+            body += "\n\n" + note(t.get("roles.not_in_bot"));
+        }
 
         Keyboard keyboard = Keyboard.create()
-                .row(pager(page, ROLE_PAGES, Callbacks::roles))
-                .row(button(Theme.ICON_HOW_TO + " How to Play", Callbacks.howToPlay(1)));
-        return Screen.withBanner(Banner.ROLES, body, withNavigation(keyboard).build());
-    }
-
-    private static String roleCard(String name, String kind, String who, String task, String goal) {
-        return heading(Theme.ICON_ROLES, name, kind) + "\n\n"
-                + esc(who) + "\n\n"
-                + bold("Your job") + "\n" + esc(task) + "\n\n"
-                + bold("Your goal") + "\n" + esc(goal);
+                .row(pager(t, page, ROLE_PAGES, Callbacks::roles))
+                .row(button(Theme.ICON_HOW_TO + " " + t.get("btn.how_to_play"), Callbacks.howToPlay(1)));
+        return t.banner(Banner.ROLES, body, withNavigation(t, keyboard).build());
     }
 
     // ---------------------------------------------------------------- Records
 
-    public static Screen statistics(Optional<PlayerStats> stats, Optional<Integer> rank) {
+    public static Screen statistics(Texts t, Optional<PlayerStats> stats, Optional<Integer> rank) {
         Keyboard keyboard = Keyboard.create();
         StringBuilder text = new StringBuilder();
 
         if (stats.isEmpty() || stats.get().getGames() == 0) {
-            text.append(heading(Theme.ICON_STATS, "MY STATISTICS", "No closed cases yet")).append("\n\n");
-            text.append("Your record starts with your first finished case. ");
-            text.append("Wins, roles and solved crimes will appear here.\n\n");
-            text.append(italic("Practice cases with test players are not counted."));
-            keyboard.row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.CREATE_ROOM),
-                    button(Theme.ICON_JOIN + " Join Game Room", Callbacks.JOIN_ROOM));
+            text.append(heading(Theme.ICON_STATS, t.get("stats.title"), t.get("stats.none.sub"))).append("\n\n");
+            text.append(t.get("stats.none.body")).append("\n\n");
+            text.append(italic(t.get("stats.none.practice")));
+            keyboard.row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.CREATE_ROOM),
+                    button(Theme.ICON_JOIN + " " + t.get("btn.join_game_room"), Callbacks.JOIN_ROOM));
         } else {
             PlayerStats record = stats.get();
-            String subline = Theme.rankTitle(record.getWins())
-                    + rank.map(position -> ", rank " + position + " on the leaderboard").orElse("");
-            text.append(heading(Theme.ICON_STATS, "MY STATISTICS", subline)).append("\n\n");
-            text.append("<pre>")
-                    .append(statRow("Cases closed", record.getGames()))
-                    .append(statRow("Cases won", record.getWins()))
-                    .append(statRow("Win rate", record.winRatePercent() + "%"))
-                    .append(statRow("Crimes solved", record.getCasesSolved()))
-                    .append(statRow("Clean escapes", record.getEscapes()))
-                    .append("\n")
-                    .append(statRow("As Investigator", record.getAsInvestigator()))
-                    .append(statRow("As Murderer", record.getAsMurderer()))
-                    .append(statRow("As Scientist", record.getAsForensicScientist()))
-                    .append("</pre>");
-            keyboard.row(button(Theme.ICON_LEADERBOARD + " Leaderboard", Callbacks.LEADERBOARD));
+            String subline = t.rank(record.getWins())
+                    + rank.map(position -> t.get("stats.rank_suffix", position)).orElse("");
+            text.append(heading(Theme.ICON_STATS, t.get("stats.title"), subline)).append("\n\n");
+
+            List<String[]> rows = new ArrayList<>();
+            rows.add(statRow(t, "closed", t.number(record.getGames())));
+            rows.add(statRow(t, "won", t.number(record.getWins())));
+            rows.add(statRow(t, "rate", t.get("common.percent", record.winRatePercent())));
+            rows.add(statRow(t, "solved", t.number(record.getCasesSolved())));
+            rows.add(statRow(t, "escapes", t.number(record.getEscapes())));
+            rows.add(null);
+            rows.add(statRow(t, "investigator", t.number(record.getAsInvestigator())));
+            rows.add(statRow(t, "murderer", t.number(record.getAsMurderer())));
+            rows.add(statRow(t, "scientist", t.number(record.getAsForensicScientist())));
+            text.append(table(t, rows));
+            keyboard.row(button(Theme.ICON_LEADERBOARD + " " + t.get("btn.leaderboard"), Callbacks.LEADERBOARD));
         }
-        return Screen.withBanner(Banner.RECORDS, text.toString(), withNavigation(keyboard).build());
+        return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    private static String statRow(String label, Object value) {
-        return String.format("%-17s%5s%n", label, value);
+    private static String[] statRow(Texts t, String name, String value) {
+        return new String[]{t.get("stats.row." + name), value};
     }
 
-    public static Screen leaderboard(List<PlayerStats> top, long viewerId, Optional<Integer> viewerRank) {
+    /**
+     * Label and value pairs. Left-to-right languages get an aligned table in a fixed-width font.
+     * Padding with spaces does not line up in right-to-left text, so there every pair is one line.
+     */
+    private static String table(Texts t, List<String[]> rows) {
+        StringBuilder table = new StringBuilder();
+        if (t.isRightToLeft()) {
+            for (String[] row : rows) {
+                table.append(row == null ? "" : esc(row[0]) + ": " + bold(row[1])).append("\n");
+            }
+            return table.toString().stripTrailing();
+        }
+        table.append("<pre>");
+        for (String[] row : rows) {
+            table.append(row == null ? "\n" : String.format("%-17s%5s%n", row[0], row[1]));
+        }
+        return table.append("</pre>").toString();
+    }
+
+    public static Screen leaderboard(Texts t, List<PlayerStats> top, long viewerId, Optional<Integer> viewerRank) {
         Keyboard keyboard = Keyboard.create();
         StringBuilder text = new StringBuilder();
 
         if (top.isEmpty()) {
-            text.append(heading(Theme.ICON_LEADERBOARD, "LEADERBOARD", "No closed cases yet")).append("\n\n");
-            text.append("The board fills up as soon as the first case is finished. ");
-            text.append("Be the first name on it.");
-            keyboard.row(button(Theme.ICON_CREATE + " Create Game Room", Callbacks.CREATE_ROOM));
+            text.append(heading(Theme.ICON_LEADERBOARD, t.get("top.title"), t.get("top.none.sub"))).append("\n\n");
+            text.append(t.get("top.none.body"));
+            keyboard.row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.CREATE_ROOM));
         } else {
-            text.append(heading(Theme.ICON_LEADERBOARD, "LEADERBOARD", "Ranked by cases won")).append("\n\n");
-            text.append("<pre>");
-            text.append(String.format("%-3s%-14s%5s%6s%n", "#", "Detective", "Won", "Rate"));
-            for (int i = 0; i < top.size(); i++) {
-                PlayerStats entry = top.get(i);
-                String marker = entry.getUserId() == viewerId ? "▸" : " ";
-                text.append(String.format("%-3s%-14s%5d%5d%%%s%n", i + 1,
-                        esc(shorten(entry.getName(), 13)), entry.getWins(), entry.winRatePercent(), marker));
-            }
-            text.append("</pre>");
+            text.append(heading(Theme.ICON_LEADERBOARD, t.get("top.title"), t.get("top.sub"))).append("\n\n");
+            text.append(t.isRightToLeft() ? ranking(t, top, viewerId) : rankingTable(t, top, viewerId));
             boolean viewerListed = top.stream().anyMatch(entry -> entry.getUserId() == viewerId);
             if (!viewerListed) {
                 text.append("\n").append(viewerRank
-                        .map(position -> "You are on rank " + position + ".")
-                        .orElse(italic("Finish a case to appear on the board.")));
+                        .map(position -> t.get("top.you_rank", position))
+                        .orElse(italic(t.get("top.finish"))));
             }
-            keyboard.row(button(Theme.ICON_STATS + " My Statistics", Callbacks.STATISTICS));
+            keyboard.row(button(Theme.ICON_STATS + " " + t.get("btn.my_statistics"), Callbacks.STATISTICS));
         }
-        return Screen.withBanner(Banner.RECORDS, text.toString(), withNavigation(keyboard).build());
+        return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    public static Screen profile(String fullName, String username, long userId,
+    private static String rankingTable(Texts t, List<PlayerStats> top, long viewerId) {
+        StringBuilder table = new StringBuilder("<pre>");
+        table.append(String.format("%-3s%-14s%5s%6s%n", "#",
+                t.get("top.col.detective"), t.get("top.col.won"), t.get("top.col.rate")));
+        for (int i = 0; i < top.size(); i++) {
+            PlayerStats entry = top.get(i);
+            String marker = entry.getUserId() == viewerId ? "▸" : " ";
+            table.append(String.format("%-3s%-14s%5d%5d%%%s%n", i + 1,
+                    esc(t.shorten(entry.getName(), 13)), entry.getWins(), entry.winRatePercent(), marker));
+        }
+        return table.append("</pre>").toString();
+    }
+
+    private static String ranking(Texts t, List<PlayerStats> top, long viewerId) {
+        StringBuilder list = new StringBuilder();
+        for (int i = 0; i < top.size(); i++) {
+            PlayerStats entry = top.get(i);
+            String line = t.get("top.row", i + 1, t.name(entry.getName(), 18), entry.getWins(),
+                    t.get("common.percent", entry.winRatePercent()));
+            list.append(entry.getUserId() == viewerId ? "▸ <b>" + line + "</b>" : line).append("\n");
+        }
+        return list.toString();
+    }
+
+    public static Screen profile(Texts t, String fullName, String username, long userId,
                                  Optional<PlayerStats> stats, Optional<Integer> rank, int openRooms) {
         int wins = stats.map(PlayerStats::getWins).orElse(0);
         int games = stats.map(PlayerStats::getGames).orElse(0);
 
         StringBuilder text = new StringBuilder();
-        text.append(heading(Theme.ICON_PROFILE, "PROFILE", Theme.rankTitle(wins))).append("\n\n");
-        text.append(bold(shorten(fullName, 40))).append("\n");
+        text.append(heading(Theme.ICON_PROFILE, t.get("profile.title"), t.rank(wins))).append("\n\n");
+        text.append(bold(t.plainName(fullName, 40))).append("\n");
         if (username != null && !username.isBlank()) {
-            text.append("@").append(esc(username)).append("\n");
+            text.append(t.dyn("@" + username)).append("\n");
         }
-        text.append("Telegram ID ").append(code(String.valueOf(userId))).append("\n\n");
-        text.append("Cases closed: ").append(games).append("\n");
-        text.append("Cases won: ").append(wins).append("\n");
-        text.append("Leaderboard: ").append(rank.map(position -> "rank " + position).orElse("not ranked yet"))
-                .append("\n");
-        text.append("Open rooms: ").append(openRooms);
+        text.append(t.get("profile.id", code(String.valueOf(userId)))).append("\n\n");
+        text.append(t.get("profile.closed", games)).append("\n");
+        text.append(t.get("profile.won", wins)).append("\n");
+        text.append(t.get("profile.rank", rank
+                .map(position -> t.get("profile.rank.value", position))
+                .orElse(t.get("profile.rank.none")))).append("\n");
+        text.append(t.get("profile.rooms", openRooms)).append("\n");
+        text.append(t.get("profile.language", t.language().flag() + " " + t.language().nativeName()));
 
         Keyboard keyboard = Keyboard.create()
-                .row(button(Theme.ICON_STATS + " My Statistics", Callbacks.STATISTICS));
-        return Screen.withBanner(Banner.RECORDS, text.toString(), withNavigation(keyboard).build());
+                .row(button(Theme.ICON_STATS + " " + t.get("btn.my_statistics"), Callbacks.STATISTICS),
+                        languageButton());
+        return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
     }
 
     // ---------------------------------------------------------------- Shared parts
 
     /** Adds the navigation row that every dashboard screen ends with. */
-    public static Keyboard withNavigation(Keyboard keyboard) {
-        return keyboard.row(
-                button(Theme.ICON_HOME + " Home", Callbacks.HOME),
-                button(Theme.ICON_ROOMS + " Rooms", Callbacks.ROOMS),
-                button(Theme.ICON_LEADERBOARD + " Leaders", Callbacks.LEADERBOARD),
-                button(Theme.ICON_PROFILE + " Profile", Callbacks.PROFILE));
+    public static Keyboard withNavigation(Texts t, Keyboard keyboard) {
+        List<InlineKeyboardButton> buttons = new ArrayList<>(List.of(
+                button(Theme.ICON_HOME + " " + t.get("nav.home"), Callbacks.HOME),
+                button(Theme.ICON_ROOMS + " " + t.get("nav.rooms"), Callbacks.ROOMS),
+                button(Theme.ICON_LEADERBOARD + " " + t.get("nav.leaders"), Callbacks.LEADERBOARD),
+                button(Theme.ICON_PROFILE + " " + t.get("nav.profile"), Callbacks.PROFILE)));
+        return keyboard.row(inReadingOrder(t, buttons));
     }
 
-    private static InlineKeyboardButton[] pager(int page, int pages,
-                                                java.util.function.IntFunction<String> target) {
+    /**
+     * Back, page number and Next. In a right-to-left language "next" lies to the left,
+     * so the row and its arrows are mirrored.
+     */
+    private static InlineKeyboardButton[] pager(Texts t, int page, int pages, IntFunction<String> target) {
+        String towardsStart = t.isRightToLeft() ? "▶" : "◀";
+        String towardsEnd = t.isRightToLeft() ? "◀" : "▶";
+
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         buttons.add(page > 1
-                ? button("◀ Back", target.apply(page - 1))
+                ? button(towardsStart + " " + t.get("btn.back"), target.apply(page - 1))
                 : button("·", Callbacks.NO_ACTION));
-        buttons.add(button(page + " / " + pages, Callbacks.NO_ACTION));
+        buttons.add(button(t.get("common.page", page, pages), Callbacks.NO_ACTION));
         buttons.add(page < pages
-                ? button("Next ▶", target.apply(page + 1))
+                ? button(t.get("btn.next") + " " + towardsEnd, target.apply(page + 1))
                 : button("·", Callbacks.NO_ACTION));
+        return inReadingOrder(t, buttons);
+    }
+
+    /** Telegram always lays buttons out from left to right. This puts the first button where reading starts. */
+    private static InlineKeyboardButton[] inReadingOrder(Texts t, List<InlineKeyboardButton> buttons) {
+        if (t.isRightToLeft()) {
+            Collections.reverse(buttons);
+        }
         return buttons.toArray(InlineKeyboardButton[]::new);
     }
 
     private static int clamp(int page, int pages) {
         return Math.max(1, Math.min(pages, page));
-    }
-
-    /** Cuts long names so one long title cannot break a screen. */
-    public static String shorten(String text, int maxLength) {
-        if (text == null || text.isBlank()) {
-            return "Unknown";
-        }
-        String clean = text.strip();
-        if (clean.codePointCount(0, clean.length()) <= maxLength) {
-            return clean;
-        }
-        int end = clean.offsetByCodePoints(0, maxLength - 1);
-        return clean.substring(0, end).stripTrailing() + "…";
     }
 }
