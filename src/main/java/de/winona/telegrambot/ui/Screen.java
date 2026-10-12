@@ -18,8 +18,6 @@ public record Screen(Banner banner, Language language, String html, InlineKeyboa
 
     /** Telegram's limit for the text under a photo. */
     public static final int MAX_CAPTION_LENGTH = 1024;
-    /** Telegram's limit for a text message. */
-    public static final int MAX_TEXT_LENGTH = 4096;
 
     private static final String LANGUAGE_DIVIDER = "\n\n┄┄┄┄┄┄┄┄┄┄\n\n";
     private static final String LABEL_DIVIDER = " · ";

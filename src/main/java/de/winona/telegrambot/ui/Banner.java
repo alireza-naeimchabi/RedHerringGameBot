@@ -23,10 +23,6 @@ public enum Banner {
         this.fileName = "banner-" + name + ".jpg";
     }
 
-    public String fileName() {
-        return fileName;
-    }
-
     public String resourcePath(Language language) {
         if (language == null || language == Language.DEFAULT) {
             return "/ui/" + fileName;

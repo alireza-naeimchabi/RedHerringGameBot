@@ -25,10 +25,6 @@ public class Localizer {
         this.languages = languages;
     }
 
-    public Language languageOf(long userId) {
-        return languages.languageOf(userId);
-    }
-
     public void setLanguage(long userId, Language language) {
         languages.setLanguage(userId, language);
     }
