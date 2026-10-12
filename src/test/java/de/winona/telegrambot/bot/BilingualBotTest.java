@@ -43,9 +43,6 @@ class BilingualBotTest {
     private static final Pattern WESTERN_DIGIT = Pattern.compile("[0-9]");
 
     private static final Texts EN = Texts.of(Language.ENGLISH);
-    /** What the Forensic Scientist types, translated into their own language before sending. */
-    private static final List<String> TYPED_ANSWERS = List.of("Silent", "A dull thud", "A struggle",
-            "A short cry", "Something fell over", "A door slammed");
     private static final Texts FA = Texts.of(Language.PERSIAN);
 
     private final User alireza = FakeTelegram.user(11, "Alireza");
@@ -514,6 +511,15 @@ class BilingualBotTest {
         return languages.languageOf(user.getId()) == Language.PERSIAN ? FA : EN;
     }
 
+    /** The first idea the open scene tile suggests, as the scientist reads it. */
+    private String firstIdea(User scientist) {
+        String html = telegram.last(scientist.getId()).html;
+        String ideas = html.lines().filter(line -> line.contains(" · ")).findFirst().orElseThrow()
+                .replaceAll("<[^>]+>", "")
+                .replaceAll("[\u200e\u200f\u2066-\u2069]", "");
+        return ideas.substring(ideas.indexOf(": ") + 2, ideas.indexOf(" · "));
+    }
+
     private void say(User user, String text) {
         bot.consume(FakeTelegram.text(user, user.getId(), null, text));
     }
@@ -627,9 +633,9 @@ class BilingualBotTest {
                 scientistTexts.get("sci.solution.title")
         ).isPresent());
 
-        // The answers are typed, in the scientist's own language.
-        for (String answer : TYPED_ANSWERS) {
-            say(scientist, scientistTexts.option(answer));
+        // The scientist types one of the suggested ideas, in their own language.
+        for (int i = 0; i < 6; i++) {
+            say(scientist, firstIdea(scientist));
         }
 
         assertTrue(telegram.find(

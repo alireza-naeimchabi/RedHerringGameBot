@@ -299,7 +299,6 @@ public final class GameScreens
 
     /** The scene tile the Forensic Scientist answers next, with the answers given so far. */
     public static Screen sceneTile(Texts t, Game game, HintTile tile) {
-        long chatId = game.getRoom().groupChatId();
         int number = game.getCurrentHintIndex() + 1;
 
         StringBuilder text = new StringBuilder();
@@ -310,9 +309,7 @@ public final class GameScreens
             text.append("\n");
         }
         text.append(tileQuestion(t, game, tile));
-
-        String prefix = Callbacks.game(Callbacks.HINT, chatId, game.getCurrentHintIndex()) + Callbacks.SEPARATOR;
-        return t.text(text.toString(), CardKeyboardFactory.createOptionKeyboard(t, tile.options(), prefix));
+        return t.text(text.toString());
     }
 
     public static Screen tilesPlaced(Texts t, Game game) {

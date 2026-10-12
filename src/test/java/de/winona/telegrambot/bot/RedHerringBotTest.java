@@ -351,9 +351,10 @@ class RedHerringBotTest {
         assertTrue(telegram.last(GROUP).html.contains("The lab opens when the scene report"));
         press(scientist, tile, tile.buttons().get(1).getCallbackData());
         assertEquals(5, tile.buttons().size(), "only Cause of death cannot be replaced");
-        say(scientist, "A new typed answer");
+        press(scientist, tile, tile.buttons().get(0).getCallbackData());
         assertTrue(tile.html.contains("NEW SCENE TILE"));
-        press(scientist, tile, tile.buttons().get(3).getCallbackData());
+        assertTrue(tile.buttons().isEmpty(), "the new answer is typed as well");
+        say(scientist, "A new typed answer");
         Shown secondReport = telegram.last(GROUP);
         assertTrue(secondReport.html.contains("round 2 of 3"));
         assertTrue(secondReport.html.contains("Lab results"));

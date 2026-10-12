@@ -27,7 +27,9 @@ import java.util.regex.Pattern;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Random;
 import java.util.function.Function;
 
@@ -268,15 +270,25 @@ public class GameController
         }
         Game game = gameOpt.get();
         Player scientist = game.getForensicScientist();
-
-        Optional<Msg> problem = whyAnswerIsRejected(game, text);
-        if (problem.isPresent()) {
-            sendPrivately(scientist, t -> GameScreens.notice(t, Theme.ICON_WRONG, problem.get()));
-            return true;
-        }
-
         boolean replacesOldAnswer = game.hasPendingSlot();
-        game.addTypedAnswer(text);
+
+        // One of the suggested ideas, in any language: saved as that option, so every
+        // player reads it in their own language. Only free text stays as it was typed.
+        OptionalInt option = matchingOption(game.getOpenTile(), text);
+        if (option.isPresent()) {
+            if (replacesOldAnswer) {
+                game.addReplacementHint(option.getAsInt());
+            } else {
+                game.addHint(option.getAsInt());
+            }
+        } else {
+            Optional<Msg> problem = whyAnswerIsRejected(game, text);
+            if (problem.isPresent()) {
+                sendPrivately(scientist, t -> GameScreens.notice(t, Theme.ICON_WRONG, problem.get()));
+                return true;
+            }
+            game.addTypedAnswer(text);
+        }
 
         if (replacesOldAnswer) {
             sendToGroup(game, t -> GameScreens.sceneReport(t, game));
@@ -287,6 +299,32 @@ public class GameController
             askForNextTile(game, null);
         }
         return true;
+    }
+
+    /** The option of the tile the text stands for, in any language, or empty for free text. */
+    private static OptionalInt matchingOption(HintTile tile, String text) {
+        String typed = comparable(text);
+        for (int i = 0; i < tile.options().size(); i++) {
+            for (Language language : Language.values()) {
+                if (comparable(Texts.of(language).option(tile.options().get(i))).equals(typed)) {
+                    return OptionalInt.of(i);
+                }
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /**
+     * Only letters and digits, in lower case, with the Arabic forms of ی and ک written the Persian way,
+     * so "Silent." matches "silent" and "بی صدا" matches "بی‌صدا".
+     */
+    private static String comparable(String text) {
+        StringBuilder letters = new StringBuilder();
+        text.toLowerCase(Locale.ROOT).codePoints()
+                .filter(Character::isLetterOrDigit)
+                .map(c -> c == 'ي' ? 'ی' : c == 'ك' ? 'ک' : c)
+                .forEach(letters::appendCodePoint);
+        return letters.toString();
     }
 
     /** A typed answer must be short and must not name a player or a card on the table. */
