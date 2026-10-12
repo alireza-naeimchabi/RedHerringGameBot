@@ -6,8 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class Lobby
-{
+public class Lobby {
 
     public static final int MIN_PLAYERS = 4;
     public static final int MAX_PLAYERS = 7;
@@ -61,7 +60,9 @@ public class Lobby
         return room.createdAt().plus(TIME_TO_LIVE).isBefore(now);
     }
 
-    /** The message in the group that shows this lobby, so it can be updated in place. */
+    /**
+     * The message in the group that shows this lobby, so it can be updated in place.
+     */
     public Integer getCardMessageId() {
         return cardMessageId;
     }

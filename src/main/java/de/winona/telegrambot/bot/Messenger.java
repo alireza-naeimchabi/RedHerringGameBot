@@ -20,18 +20,13 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeAllPrivateChats;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * The only class that talks to Telegram. It knows how to show a {@link Screen}:
@@ -44,7 +39,9 @@ public class Messenger {
     private static final String NOT_MODIFIED = "message is not modified";
 
     private final TelegramClient client;
-    /** Telegram's id for each banner image after its first upload, so it is uploaded only once. */
+    /**
+     * Telegram's id for each banner image after its first upload, so it is uploaded only once.
+     */
     private final Map<String, String> uploadedBanners = new HashMap<>();
     private String botUsername;
 
@@ -54,7 +51,9 @@ public class Messenger {
 
     // ---------------------------------------------------------------- Sending
 
-    /** Sends a screen as a new message. Returns where it landed, or empty if sending failed. */
+    /**
+     * Sends a screen as a new message. Returns where it landed, or empty if sending failed.
+     */
     public Optional<MessageRef> send(long chatId, Screen screen) {
         if (screen.hasBanner()) {
             if (!screen.fitsCaption()) {
@@ -199,7 +198,9 @@ public class Messenger {
 
     // ---------------------------------------------------------------- Banners
 
-    /** Every language has its own artwork. A missing translation falls back to the default set. */
+    /**
+     * Every language has its own artwork. A missing translation falls back to the default set.
+     */
     private String bannerPath(Screen screen) {
         String localized = screen.banner().resourcePath(screen.language());
         return Messenger.class.getResource(localized) != null
@@ -218,7 +219,9 @@ public class Messenger {
         return image;
     }
 
-    /** The file name Telegram sees: "banner-home.jpg", or "fa-banner-home.jpg" for the Persian artwork. */
+    /**
+     * The file name Telegram sees: "banner-home.jpg", or "fa-banner-home.jpg" for the Persian artwork.
+     */
     private String uploadName(String path) {
         return path.substring("/ui/".length()).replace('/', '-');
     }
@@ -252,7 +255,9 @@ public class Messenger {
 
     // ---------------------------------------------------------------- Callbacks and bot info
 
-    /** Stops the loading animation of a pressed button. The text is optional. */
+    /**
+     * Stops the loading animation of a pressed button. The text is optional.
+     */
     public void answerCallback(String callbackId, String text, boolean asAlert) {
         try {
             client.execute(AnswerCallbackQuery.builder()
@@ -265,7 +270,9 @@ public class Messenger {
         }
     }
 
-    /** Answers a pressed button by opening a link, for example the private chat with this bot. */
+    /**
+     * Answers a pressed button by opening a link, for example the private chat with this bot.
+     */
     public boolean answerCallbackWithUrl(String callbackId, String url) {
         try {
             client.execute(AnswerCallbackQuery.builder()
@@ -279,7 +286,9 @@ public class Messenger {
         }
     }
 
-    /** The bot's @username without the @, or an empty text if Telegram cannot be asked. */
+    /**
+     * The bot's @username without the @, or an empty text if Telegram cannot be asked.
+     */
     public String botUsername() {
         if (botUsername == null) {
             try {
@@ -292,7 +301,9 @@ public class Messenger {
         return botUsername == null ? "" : botUsername;
     }
 
-    /** Link that opens the private chat with this bot and passes a start parameter. */
+    /**
+     * Link that opens the private chat with this bot and passes a start parameter.
+     */
     public Optional<String> deepLink(String startParameter) {
         String username = botUsername();
         return username.isBlank()

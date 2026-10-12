@@ -2,19 +2,7 @@ package de.winona.telegrambot.ui;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.model.Card;
-import de.winona.telegrambot.model.CardType;
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Hand;
-import de.winona.telegrambot.model.Hint;
-import de.winona.telegrambot.model.HintTile;
-import de.winona.telegrambot.model.LabResult;
-import de.winona.telegrambot.model.Lobby;
-import de.winona.telegrambot.model.Player;
-import de.winona.telegrambot.model.Role;
-import de.winona.telegrambot.model.Room;
-import de.winona.telegrambot.model.RoomEnd;
-import de.winona.telegrambot.model.TileSubject;
+import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.util.CardKeyboardFactory;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -27,20 +15,14 @@ import java.util.stream.Collectors;
 
 import static de.winona.telegrambot.ui.Keyboard.button;
 import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.Theme.bold;
-import static de.winona.telegrambot.ui.Theme.code;
-import static de.winona.telegrambot.ui.Theme.esc;
-import static de.winona.telegrambot.ui.Theme.heading;
-import static de.winona.telegrambot.ui.Theme.italic;
-import static de.winona.telegrambot.ui.Theme.note;
+import static de.winona.telegrambot.ui.Theme.*;
 
 /**
  * The screens of a room and a running case: the room card in the group, the private role
  * messages, the scene report, the lab, the accusation and the verdict.
  * The first parameter is always the {@link Texts} of the language to write in.
  */
-public final class GameScreens
-{
+public final class GameScreens {
 
     private static final int NAME_LENGTH = 22;
     private static final int TITLE_LENGTH = 32;
@@ -80,7 +62,9 @@ public final class GameScreens
         return t.text(text.toString(), keyboard.build());
     }
 
-    /** Replaces the room card when the room can no longer be joined. */
+    /**
+     * Replaces the room card when the room can no longer be joined.
+     */
     public static Screen roomEnded(Texts t, String roomCode, RoomEnd reason) {
         return switch (reason) {
             case CLOSED_BY_HOST -> t.text(Theme.ICON_ROOMS + " " + bold(t.get("ended.closed.title", roomCode))
@@ -98,17 +82,23 @@ public final class GameScreens
                 .build();
     }
 
-    /** Shown in a group that has neither a room nor a case. */
+    /**
+     * Shown in a group that has neither a room nor a case.
+     */
     public static Screen noRoomHere(Texts t) {
         return t.text(Theme.ICON_ROOMS + " " + t.get("group.no_room"), newRoomKeyboard(t));
     }
 
-    /** One line, for example a problem with a command. */
+    /**
+     * One line, for example a problem with a command.
+     */
     public static Screen notice(Texts t, String icon, Msg message) {
         return t.text(icon + " " + esc(t.get(message)));
     }
 
-    /** Private confirmation after taking a seat. */
+    /**
+     * Private confirmation after taking a seat.
+     */
     public static Screen seatTaken(Texts t, Lobby lobby) {
         Room room = lobby.getRoom();
         String text = Theme.ICON_OK + " " + bold(t.get("seat.title", room.code())) + "\n"
@@ -120,7 +110,9 @@ public final class GameScreens
                 .build());
     }
 
-    /** Asks a player in the group to open the private chat, which also seats them. */
+    /**
+     * Asks a player in the group to open the private chat, which also seats them.
+     */
     public static Screen needsPrivateChat(Texts t, String firstName, String deepLink) {
         String text = Theme.ICON_SECRET + " "
                 + t.get("group.needs_private", bold(t.plainName(firstName, NAME_LENGTH)));
@@ -132,7 +124,9 @@ public final class GameScreens
                 .build());
     }
 
-    /** The short rules for the group, with a link to the full guide in the private chat. */
+    /**
+     * The short rules for the group, with a link to the full guide in the private chat.
+     */
     public static Screen groupHelp(Texts t, String deepLink) {
         String text = heading(Theme.ICON_HOW_TO, t.get("how.title"), t.get("group.help.sub")) + "\n\n"
                 + t.get("group.help.body");
@@ -185,7 +179,9 @@ public final class GameScreens
         return t.text(text.toString());
     }
 
-    /** Card names with the lab's findings: cleared cards are crossed out, cards with a trace stand out. */
+    /**
+     * Card names with the lab's findings: cleared cards are crossed out, cards with a trace stand out.
+     */
     private static String cardNames(Texts t, Game game, List<Card> cards) {
         return cards.stream()
                 .map(card -> game.findLabResult(card)
@@ -196,13 +192,15 @@ public final class GameScreens
                 .collect(Collectors.joining(t.get("common.list_separator")));
     }
 
-    /** The private message that tells a player their role. */
+    /**
+     * The private message that tells a player their role.
+     */
     public static Screen roleBriefing(Texts t, Game game, Role role) {
         String roleKey = role.name().toLowerCase(Locale.ROOT);
         String text = Theme.ICON_SECRET + " "
                 + bold(t.get("brief.title", t.role(role).toUpperCase(Locale.ROOT))) + "\n"
                 + italic(t.get("brief.sub", game.getRoom().code(),
-                        t.plainName(game.getRoom().groupTitle(), TITLE_LENGTH))) + "\n\n"
+                t.plainName(game.getRoom().groupTitle(), TITLE_LENGTH))) + "\n\n"
                 + esc(t.roleDescription(role)) + "\n\n"
                 + note(t.get("brief.next." + roleKey));
         return t.text(text);
@@ -234,7 +232,7 @@ public final class GameScreens
         String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
                 + italic(t.get("common.step", 3, 5)) + "\n\n"
                 + t.get("frame.who.cards", bold(t.card(game.getMurderWeapon())),
-                        bold(t.card(game.getKeyEvidence()))) + "\n\n"
+                bold(t.card(game.getKeyEvidence()))) + "\n\n"
                 + t.get("frame.who.body");
 
         List<InlineKeyboardButton> buttons = new ArrayList<>();
@@ -250,7 +248,7 @@ public final class GameScreens
         String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
                 + italic(t.get("common.step", 4, 5)) + "\n\n"
                 + t.get("frame.means.intro", bold(name(t, game.getScapegoat())),
-                        bold(t.card(game.getMurderWeapon()))) + "\n\n"
+                bold(t.card(game.getMurderWeapon()))) + "\n\n"
                 + t.get("frame.means.ask") + " " + italic(t.get("frame.means.tip"));
         return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
                 game.getScapegoatHand().weapons(), Callbacks.game(Callbacks.FRAME_MEANS, chatId) + Callbacks.SEPARATOR));
@@ -261,7 +259,7 @@ public final class GameScreens
         String text = Theme.ICON_HERRING + " " + bold(t.get("frame.title")) + "\n"
                 + italic(t.get("common.step", 5, 5)) + "\n\n"
                 + t.get("frame.clue.intro", bold(t.card(game.getPlantedMeans())),
-                        bold(t.card(game.getKeyEvidence()))) + "\n\n"
+                bold(t.card(game.getKeyEvidence()))) + "\n\n"
                 + t.get("frame.clue.ask");
         return t.text(text, CardKeyboardFactory.createCardKeyboard(t,
                 game.getScapegoatHand().evidence(), Callbacks.game(Callbacks.FRAME_CLUE, chatId) + Callbacks.SEPARATOR));
@@ -297,7 +295,9 @@ public final class GameScreens
         return t.text(text);
     }
 
-    /** The scene tile the Forensic Scientist answers next, with the answers given so far. */
+    /**
+     * The scene tile the Forensic Scientist answers next, with the answers given so far.
+     */
     public static Screen sceneTile(Texts t, Game game, HintTile tile) {
         int number = game.getCurrentHintIndex() + 1;
 
@@ -325,7 +325,9 @@ public final class GameScreens
                 .build());
     }
 
-    /** Start of a new round: the Forensic Scientist picks one of the offered tiles. */
+    /**
+     * Start of a new round: the Forensic Scientist picks one of the offered tiles.
+     */
     public static Screen chooseNewTile(Texts t, Game game) {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
@@ -344,8 +346,7 @@ public final class GameScreens
         return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
     }
 
-    public static Screen chooseTileToReplace(Texts t, Game game, HintTile newTile)
-    {
+    public static Screen chooseTileToReplace(Texts t, Game game, HintTile newTile) {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
         text.append(Theme.ICON_ROUND).append(" ")
@@ -365,8 +366,7 @@ public final class GameScreens
         return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
     }
 
-    public static Screen replacementTile(Texts t, Game game, HintTile tile)
-    {
+    public static Screen replacementTile(Texts t, Game game, HintTile tile) {
         String text = Theme.ICON_SCIENTIST + " " + bold(t.get("newtile.title")) + "\n\n"
                 + tileQuestion(t, game, tile);
         return t.text(text);
@@ -392,7 +392,7 @@ public final class GameScreens
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
         text.append(heading(Theme.ICON_SCIENTIST, t.get("report.title"),
-                t.get("report.sub", game.getRoom().code(), game.getRound(), Game.MAX_ROUNDS)))
+                        t.get("report.sub", game.getRoom().code(), game.getRound(), Game.MAX_ROUNDS)))
                 .append("\n\n");
         text.append(hintLines(t, game.getHints())).append("\n");
         if (!game.getLabResults().isEmpty()) {
@@ -402,7 +402,7 @@ public final class GameScreens
         text.append(note(game.isLastRound()
                 ? t.get("report.final")
                 : Theme.ICON_LAB + " " + t.get("report.lab_open") + "\n"
-                        + Theme.ICON_HERRING + " " + t.get("report.herring")));
+                  + Theme.ICON_HERRING + " " + t.get("report.herring")));
 
         return t.text(text.toString(), Keyboard.create()
                 .row(button(Theme.ICON_LAB + " " + t.get("btn.lab_test"), Callbacks.game(Callbacks.LAB_START, chatId)),
@@ -419,7 +419,9 @@ public final class GameScreens
                 Callbacks.game(Callbacks.NEXT_ROUND, chatId));
     }
 
-    /** Every answer starts with the icon of the card type it describes. */
+    /**
+     * Every answer starts with the icon of the card type it describes.
+     */
     private static String hintLines(Texts t, List<Hint> hints) {
         StringBuilder lines = new StringBuilder();
         for (Hint hint : hints) {
@@ -428,12 +430,13 @@ public final class GameScreens
         return lines.toString();
     }
 
-    private static String hintLine(Texts t, Hint hint)
-    {
+    private static String hintLine(Texts t, Hint hint) {
         return subjectIcon(hint.subject()) + " " + esc(t.tile(hint.title())) + ": " + bold(answerText(t, hint));
     }
 
-    /** A typed answer exactly as written, a chosen option in the reader's language. Not escaped. */
+    /**
+     * A typed answer exactly as written, a chosen option in the reader's language. Not escaped.
+     */
     private static String answerText(Texts t, Hint hint) {
         return hint.typed()
                 ? t.plainName(hint.choice(), Game.MAX_ANSWER_LENGTH)
@@ -452,8 +455,7 @@ public final class GameScreens
         return card.type() == CardType.WEAPON ? Theme.ICON_MEANS : Theme.ICON_CLUE;
     }
 
-    private static String tileQuestion(Texts t, Game game, HintTile tile)
-    {
+    private static String tileQuestion(Texts t, Game game, HintTile tile) {
         String describes = switch (tile.subject()) {
             case MEANS -> t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())));
             case KEY_EVIDENCE -> t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())));
@@ -465,7 +467,9 @@ public final class GameScreens
                 + italic(t.get("tile.examples", examples(t, tile)));
     }
 
-    /** The tile's options as ideas for a typed answer. */
+    /**
+     * The tile's options as ideas for a typed answer.
+     */
     private static String examples(Texts t, HintTile tile) {
         return tile.options().stream().map(t::option).collect(Collectors.joining(" · "));
     }
@@ -503,7 +507,9 @@ public final class GameScreens
                 .build());
     }
 
-    /** All eight cards of one suspect. Cards the lab already knows show their result. */
+    /**
+     * All eight cards of one suspect. Cards the lab already knows show their result.
+     */
     public static Screen labChooseCard(Texts t, Game game, Player tester, int suspectIndex) {
         long chatId = game.getRoom().groupChatId();
         Player owner = game.getSuspects().get(suspectIndex);
@@ -537,8 +543,8 @@ public final class GameScreens
         return t.text(Theme.ICON_LAB + " " + bold(t.get("lab.result.title"))
                 + italic("  " + t.get("lab.result.round", result.round())) + "\n"
                 + t.get("lab.result.tested", esc(name(t, result.tester())),
-                        cardIcon(result.card()) + " " + bold(t.card(result.card())),
-                        bold(name(t, result.owner()))) + "\n\n"
+                cardIcon(result.card()) + " " + bold(t.card(result.card())),
+                bold(name(t, result.owner()))) + "\n\n"
                 + finding + "\n\n"
                 + italic(t.get("lab.used", game.getTestsUsedThisRound(), game.getTestsPerRound())));
     }
@@ -651,7 +657,9 @@ public final class GameScreens
         return t.banner(Banner.CASE_SOLVED, text, afterCaseKeyboard(t));
     }
 
-    /** @param reason why the case stays unsolved; names in it must not be escaped yet */
+    /**
+     * @param reason why the case stays unsolved; names in it must not be escaped yet
+     */
     public static Screen murdererEscaped(Texts t, Game game, Msg reason) {
         String text = Theme.ICON_MEANS + " " + bold(t.get("verdict.cold.title", game.getRoom().code())) + "\n"
                 + italic(t.get("verdict.cold.sub")) + "\n\n"
@@ -679,7 +687,7 @@ public final class GameScreens
                 + Theme.ICON_MEANS + " " + t.get("term.means_label", bold(t.card(game.getMurderWeapon()))) + "\n"
                 + Theme.ICON_CLUE + " " + t.get("term.evidence_label", bold(t.card(game.getKeyEvidence()))) + "\n"
                 + Theme.ICON_HERRING + " " + t.get("verdict.herring", bold(name(t, game.getScapegoat())),
-                        esc(t.card(game.getPlantedMeans())), esc(t.card(game.getPlantedClue()))));
+                esc(t.card(game.getPlantedMeans())), esc(t.card(game.getPlantedClue()))));
     }
 
     private static String roleReveal(Texts t, Game game) {
@@ -698,7 +706,9 @@ public final class GameScreens
 
     // ---------------------------------------------------------------- Case file (private, "Rejoin Game")
 
-    /** Everything one player may know about their running case, for the private chat. */
+    /**
+     * Everything one player may know about their running case, for the private chat.
+     */
     public static Screen caseFile(Texts t, Game game, long viewerId) {
         Role role = game.getRole(viewerId).orElseThrow();
 
@@ -754,7 +764,9 @@ public final class GameScreens
                 .build());
     }
 
-    /** A player's name, shortened but not escaped: wrap it in bold(), italic() or esc(). */
+    /**
+     * A player's name, shortened but not escaped: wrap it in bold(), italic() or esc().
+     */
     private static String name(Texts t, Player player) {
         return t.plainName(player.name(), NAME_LENGTH);
     }

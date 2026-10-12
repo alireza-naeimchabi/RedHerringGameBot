@@ -31,7 +31,9 @@ public class LanguageService {
         this(DEFAULT_FILE);
     }
 
-    /** @param file where the choices are stored, or null to keep them in memory only */
+    /**
+     * @param file where the choices are stored, or null to keep them in memory only
+     */
     public LanguageService(Path file) {
         this.file = file;
         load();

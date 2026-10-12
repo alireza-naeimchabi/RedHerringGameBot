@@ -1,22 +1,13 @@
 package de.winona.telegrambot.i18n;
 
-import de.winona.telegrambot.model.Card;
-import de.winona.telegrambot.model.CardDeck;
-import de.winona.telegrambot.model.CardType;
-import de.winona.telegrambot.model.Hand;
-import de.winona.telegrambot.model.HintDeck;
-import de.winona.telegrambot.model.HintTile;
-import de.winona.telegrambot.model.Role;
+import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.ui.Screen;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class TextsTest {
 

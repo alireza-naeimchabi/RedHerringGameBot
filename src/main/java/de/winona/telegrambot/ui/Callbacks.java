@@ -56,7 +56,9 @@ public final class Callbacks {
         return "m:roles:" + page;
     }
 
-    /** Sets the reader's language. The value is the stored language code, never a translated name. */
+    /**
+     * Sets the reader's language. The value is the stored language code, never a translated name.
+     */
     public static String setLanguage(String languageCode) {
         return "m:setlang:" + languageCode;
     }
@@ -85,7 +87,9 @@ public final class Callbacks {
         return "r:close:" + code;
     }
 
-    /** Opens a new room in the group the button is shown in. */
+    /**
+     * Opens a new room in the group the button is shown in.
+     */
     public static String newRoomHere() {
         return "r:new";
     }

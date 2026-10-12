@@ -11,19 +11,11 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Plays the bot from the outside, the way Telegram users would: with commands and button presses.
@@ -574,7 +566,9 @@ class RedHerringBotTest {
         assertNotNull(telegram.lastAnswer(), "button press " + data + " was not answered");
     }
 
-    /** Creates a room as Alireza and returns its code. */
+    /**
+     * Creates a room as Alireza and returns its code.
+     */
     private String createRoom() {
         group(alireza, "/newgame");
         Matcher matcher = Pattern.compile("ROOM ([A-Z0-9]{4})").matcher(roomCard().html);
@@ -604,12 +598,16 @@ class RedHerringBotTest {
                 .orElseThrow();
     }
 
-    /** What the murderer decided, as the test read it from the buttons. */
+    /**
+     * What the murderer decided, as the test read it from the buttons.
+     */
     private record Crime(String means, String keyEvidence, String scapegoat, String plantedMeans,
                          String plantedClue) {
     }
 
-    /** Presses the murderer through all five private steps. */
+    /**
+     * Presses the murderer through all five private steps.
+     */
     private Crime commitCrime(User murderer, int meansIndex, int clueIndex) {
         Shown choice = telegram.find(murderer.getId(), "CHOOSE THE MEANS OF MURDER").orElseThrow();
         assertEquals(4, choice.buttons().size());
@@ -635,8 +633,7 @@ class RedHerringBotTest {
         return new Crime(means, keyEvidence, scapegoat, plantedMeans, plantedClue);
     }
 
-    private Shown answerAllTiles(User scientist)
-    {
+    private Shown answerAllTiles(User scientist) {
         Shown tile = telegram.find(scientist.getId(), "SCENE TILE 1 OF 6").orElseThrow();
         for (int i = 1; i <= 6; i++) {
             say(scientist, "Answer " + i);
@@ -644,7 +641,9 @@ class RedHerringBotTest {
         return telegram.find(scientist.getId(), "ROUND 1 REPORT IS OUT").orElseThrow();
     }
 
-    /** Sends one card to the lab by button labels and returns the message with the result. */
+    /**
+     * Sends one card to the lab by button labels and returns the message with the result.
+     */
     private Shown labTest(User tester, Shown report, String owner, String card, User intruder) {
         press(tester, report, report.button("Lab Test").orElseThrow().getCallbackData());
         Shown flow = telegram.last(GROUP);
@@ -659,7 +658,9 @@ class RedHerringBotTest {
         return flow;
     }
 
-    /** Any clue card of the murderer that is not the Key Evidence, read from the Evidence Board. */
+    /**
+     * Any clue card of the murderer that is not the Key Evidence, read from the Evidence Board.
+     */
     private String otherClueOf(User murderer, String keyEvidence) {
         String board = telegram.find(GROUP, "EVIDENCE BOARD").orElseThrow().html;
         String ownBlock = board.substring(board.indexOf("<b>" + murderer.getFirstName() + "</b>"));
@@ -672,7 +673,9 @@ class RedHerringBotTest {
         throw new AssertionError("no other card in " + clueLine);
     }
 
-    /** Walks through the three accusation steps by button label. */
+    /**
+     * Walks through the three accusation steps by button label.
+     */
     private void accuse(User accuser, Shown report, String suspect, String means, String clue, User intruder) {
         press(accuser, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
         Shown flow = telegram.last(GROUP);

@@ -2,18 +2,10 @@ package de.winona.telegrambot.bot;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.model.Lobby;
-import de.winona.telegrambot.model.Player;
-import de.winona.telegrambot.model.Role;
-import de.winona.telegrambot.model.Room;
-import de.winona.telegrambot.model.RoomEnd;
+import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
-import de.winona.telegrambot.ui.GameScreens;
-import de.winona.telegrambot.ui.MenuScreens;
-import de.winona.telegrambot.ui.RoomSummary;
-import de.winona.telegrambot.ui.Screen;
-import de.winona.telegrambot.ui.Theme;
+import de.winona.telegrambot.ui.*;
 import de.winona.telegrambot.util.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 
@@ -45,7 +37,9 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Creating a room
 
-    /** Opens a room in a group and posts its room card. */
+    /**
+     * Opens a room in a group and posts its room card.
+     */
     public void createRoom(long groupChatId, String groupTitle, User creator) {
         if (gameService.getGame(groupChatId).isPresent()) {
             sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
@@ -66,7 +60,9 @@ public class RoomController {
         postRoomCard(lobby);
     }
 
-    /** Posts the room card again, for example after the chat has moved on. */
+    /**
+     * Posts the room card again, for example after the chat has moved on.
+     */
     public void showRoomCard(long groupChatId, User user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isPresent()) {
@@ -89,7 +85,9 @@ public class RoomController {
         lobby.setCardMessageId(messageId);
     }
 
-    /** Updates the room card in the group after a seat changed. */
+    /**
+     * Updates the room card in the group after a seat changed.
+     */
     private void refreshRoomCard(Lobby lobby) {
         if (lobby.getCardMessageId() == null) {
             postRoomCard(lobby);
@@ -155,7 +153,9 @@ public class RoomController {
                 .orElse(JoinOutcome.UNKNOWN);
     }
 
-    /** Frees the player's seat. Returns a sentence for the player. */
+    /**
+     * Frees the player's seat. Returns a sentence for the player.
+     */
     public Msg leave(String code, User user) {
         Optional<Lobby> lobby = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobby.isEmpty()) {
@@ -201,7 +201,9 @@ public class RoomController {
         return Optional.empty();
     }
 
-    /** Closes a room that has not started. Returns empty on success, otherwise the reason why not. */
+    /**
+     * Closes a room that has not started. Returns empty on success, otherwise the reason why not.
+     */
     public Optional<Msg> closeRoom(String code, User user) {
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobbyOpt.isEmpty()) {
@@ -259,7 +261,9 @@ public class RoomController {
                 .ifPresent(problem -> sendNotice(groupChatId, user, Theme.ICON_WRONG, problem));
     }
 
-    /** /endgame while the room is still waiting: closes the room. Returns false if there is no room. */
+    /**
+     * /endgame while the room is still waiting: closes the room. Returns false if there is no room.
+     */
     public boolean closeRoomByCommand(long groupChatId, User user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
@@ -270,7 +274,9 @@ public class RoomController {
         return true;
     }
 
-    /** Practice helper for the host: fills three seats with test players. */
+    /**
+     * Practice helper for the host: fills three seats with test players.
+     */
     public void addTestPlayers(long groupChatId, User user) {
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(groupChatId);
         if (lobbyOpt.isEmpty()) {
@@ -291,7 +297,9 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Buttons
 
-    /** Handles the buttons of the room card and of the private room screen ("r:..."). */
+    /**
+     * Handles the buttons of the room card and of the private room screen ("r:...").
+     */
     public void onClick(Click click) {
         String action = click.part(1);
         String code = click.part(2);
@@ -352,7 +360,9 @@ public class RoomController {
         }
     }
 
-    /** If someone presses a button on the card of an expired room, the card is replaced. */
+    /**
+     * If someone presses a button on the card of an expired room, the card is replaced.
+     */
     private void expireStaleCard(Click click, String code) {
         boolean expired = lobbyService.endOf(code).filter(end -> end == RoomEnd.EXPIRED).isPresent();
         if (expired && click.message() != null && !click.inPrivateChat()) {
@@ -370,7 +380,9 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Who sees what, in which language
 
-    /** The room card is one message for the whole group, so it is written for everyone in the room. */
+    /**
+     * The room card is one message for the whole group, so it is written for everyone in the room.
+     */
     private Screen roomCard(Lobby lobby) {
         return forRoom(lobby, t -> GameScreens.lobbyCard(t, lobby, messenger.botUsername()));
     }
@@ -385,7 +397,9 @@ public class RoomController {
         return localizer.forUser(userId, t -> GameScreens.seatTaken(t, lobby));
     }
 
-    /** Answers a command in the group, in the language of the player who sent it. */
+    /**
+     * Answers a command in the group, in the language of the player who sent it.
+     */
     private void sendNotice(long groupChatId, User user, String icon, Msg message) {
         messenger.send(groupChatId, localizer.forUser(user.getId(), t -> GameScreens.notice(t, icon, message)));
     }

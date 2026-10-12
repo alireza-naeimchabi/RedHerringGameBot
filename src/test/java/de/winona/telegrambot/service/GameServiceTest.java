@@ -13,7 +13,9 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Roles are dealt completely at random: earlier cases in the group never matter. */
+/**
+ * Roles are dealt completely at random: earlier cases in the group never matter.
+ */
 class GameServiceTest {
 
     private static final Player HOST = new Player(1, "Host");

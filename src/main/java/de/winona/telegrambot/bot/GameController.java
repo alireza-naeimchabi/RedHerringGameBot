@@ -1,18 +1,9 @@
 package de.winona.telegrambot.bot;
 
+import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.model.AccusationResult;
-import de.winona.telegrambot.model.Card;
-import de.winona.telegrambot.model.CardDeck;
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Hand;
-import de.winona.telegrambot.model.Hint;
-import de.winona.telegrambot.model.HintTile;
-import de.winona.telegrambot.model.LabResult;
-import de.winona.telegrambot.model.Player;
-import de.winona.telegrambot.model.Role;
-import de.winona.telegrambot.model.Room;
+import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.StatsService;
 import de.winona.telegrambot.ui.Callbacks;
@@ -22,16 +13,10 @@ import de.winona.telegrambot.ui.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.User;
-import de.winona.telegrambot.i18n.Language;
-import java.util.regex.Pattern;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * Runs a case from the moment it opens until the verdict:
@@ -42,8 +27,7 @@ import java.util.function.Function;
  * <p>Languages: what goes to the group is written for all players of the case, what goes to
  * one player uses that player's language, see {@link Localizer}.
  */
-public class GameController
-{
+public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
@@ -104,7 +88,9 @@ public class GameController
 
     // ---------------------------------------------------------------- Buttons
 
-    /** Handles every button that belongs to a running case. */
+    /**
+     * Handles every button that belongs to a running case.
+     */
     public void onClick(Click click) {
         long groupChatId = click.longPart(1);
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
@@ -301,7 +287,9 @@ public class GameController
         return true;
     }
 
-    /** The option of the tile the text stands for, in any language, or empty for free text. */
+    /**
+     * The option of the tile the text stands for, in any language, or empty for free text.
+     */
     private static OptionalInt matchingOption(HintTile tile, String text) {
         String typed = comparable(text);
         for (int i = 0; i < tile.options().size(); i++) {
@@ -327,7 +315,9 @@ public class GameController
         return letters.toString();
     }
 
-    /** A typed answer must be short and must not name a player or a card on the table. */
+    /**
+     * A typed answer must be short and must not name a player or a card on the table.
+     */
     private Optional<Msg> whyAnswerIsRejected(Game game, String answer) {
         if (answer.codePointCount(0, answer.length()) > Game.MAX_ANSWER_LENGTH) {
             return Optional.of(Msg.of("err.answer.too_long", Game.MAX_ANSWER_LENGTH));
@@ -347,7 +337,9 @@ public class GameController
         return namesSomething ? Optional.of(Msg.of("err.answer.forbidden")) : Optional.empty();
     }
 
-    /** True if the text contains the word on its own, not as part of a longer word. Ignores case. */
+    /**
+     * True if the text contains the word on its own, not as part of a longer word. Ignores case.
+     */
     private static boolean mentions(String text, String word) {
         return Pattern.compile("(?iU)(?<!\\w)" + Pattern.quote(word) + "(?!\\w)").matcher(text).find();
     }
@@ -513,7 +505,9 @@ public class GameController
         return Optional.empty();
     }
 
-    /** Checks that the person pressing the button started this lab test and may still test. */
+    /**
+     * Checks that the person pressing the button started this lab test and may still test.
+     */
     private Optional<Player> testerOf(Click click, Game game) {
         long testerId = click.longPart(2);
         Optional<Player> tester = game.getPlayer(testerId);
@@ -529,7 +523,9 @@ public class GameController
         return tester;
     }
 
-    /** The name of the player a flow belongs to, or "someone else" in the reader's language. */
+    /**
+     * The name of the player a flow belongs to, or "someone else" in the reader's language.
+     */
     private Object ownerName(Optional<Player> owner) {
         return owner.<Object>map(Player::name).orElse(Msg.of("err.someone_else"));
     }
@@ -621,7 +617,9 @@ public class GameController
         return Optional.empty();
     }
 
-    /** Checks that the person pressing the button is the one who started this accusation. */
+    /**
+     * Checks that the person pressing the button is the one who started this accusation.
+     */
     private Optional<Player> accuserOf(Click click, Game game) {
         long accuserId = click.longPart(2);
         Optional<Player> accuser = game.getPlayer(accuserId);
@@ -715,7 +713,9 @@ public class GameController
 
     // ---------------------------------------------------------------- Ending the case
 
-    /** Publishes the verdict, counts the result and frees the group for a new room. */
+    /**
+     * Publishes the verdict, counts the result and frees the group for a new room.
+     */
     private void closeCase(Game game, boolean investigatorsWon, Player solver, Msg reasonIfUnsolved) {
         sendToGroup(game, t -> investigatorsWon
                 ? GameScreens.caseSolved(t, game, solver)
@@ -744,7 +744,9 @@ public class GameController
         return true;
     }
 
-    /** The private overview of a running case for one of its players ("Rejoin Game"). */
+    /**
+     * The private overview of a running case for one of its players ("Rejoin Game").
+     */
     public Optional<Screen> caseFile(String code, long userId) {
         return gameService.findByCode(code)
                 .filter(game -> game.getPlayer(userId).isPresent())
@@ -753,17 +755,23 @@ public class GameController
 
     // ---------------------------------------------------------------- Who sees what, in which language
 
-    /** A new message in the group, written for all players of the case. */
+    /**
+     * A new message in the group, written for all players of the case.
+     */
     private void sendToGroup(Game game, Function<Texts, Screen> view) {
         messenger.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
-    /** Changes the group message a button belongs to, written for all players of the case. */
+    /**
+     * Changes the group message a button belongs to, written for all players of the case.
+     */
     private void showToGroup(Click click, Game game, Function<Texts, Screen> view) {
         messenger.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
-    /** Changes the private message a button belongs to, in the language of the player who pressed it. */
+    /**
+     * Changes the private message a button belongs to, in the language of the player who pressed it.
+     */
     private void showToClicker(Click click, Function<Texts, Screen> view) {
         messenger.show(click.message(), view.apply(click.texts()));
     }
@@ -774,7 +782,9 @@ public class GameController
         }
     }
 
-    /** Shows a screen in the player's private chat, reusing their last message if there is one. */
+    /**
+     * Shows a screen in the player's private chat, reusing their last message if there is one.
+     */
     private void presentPrivately(Player player, MessageRef inPlace, Function<Texts, Screen> view) {
         if (isTestPlayer(player)) {
             return;
@@ -787,7 +797,9 @@ public class GameController
         }
     }
 
-    /** Answers a command that could not be carried out, in the language of the player who sent it. */
+    /**
+     * Answers a command that could not be carried out, in the language of the player who sent it.
+     */
     private void sendProblem(long groupChatId, User user, Msg problem) {
         messenger.send(groupChatId,
                 localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));

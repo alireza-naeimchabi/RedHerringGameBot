@@ -1,10 +1,6 @@
 package de.winona.telegrambot.model;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 
 public class CardDeck {
 

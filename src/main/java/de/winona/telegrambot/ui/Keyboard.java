@@ -7,7 +7,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.util.ArrayList;
 import java.util.List;
 
-/** Small builder for inline keyboards, so every screen lays out its buttons the same way. */
+/**
+ * Small builder for inline keyboards, so every screen lays out its buttons the same way.
+ */
 public final class Keyboard {
 
     private final List<InlineKeyboardRow> rows = new ArrayList<>();
@@ -40,7 +42,9 @@ public final class Keyboard {
         return this;
     }
 
-    /** Places the buttons in rows with the given number of columns. */
+    /**
+     * Places the buttons in rows with the given number of columns.
+     */
     public Keyboard grid(List<InlineKeyboardButton> buttons, int columns) {
         for (int i = 0; i < buttons.size(); i += columns) {
             rows.add(new InlineKeyboardRow(buttons.subList(i, Math.min(i + columns, buttons.size()))));

@@ -33,12 +33,16 @@ public class Localizer {
         return Texts.of(languages.languageOf(userId));
     }
 
-    /** A screen for one reader. */
+    /**
+     * A screen for one reader.
+     */
     public Screen forUser(long userId, Function<Texts, Screen> view) {
         return view.apply(textsFor(userId));
     }
 
-    /** A screen for a group: once per language its players use, joined into one message. */
+    /**
+     * A screen for a group: once per language its players use, joined into one message.
+     */
     public Screen forPlayers(Collection<Player> players, Function<Texts, Screen> view) {
         List<Screen> versions = languagesOf(players).stream()
                 .map(language -> view.apply(Texts.of(language)))
@@ -46,7 +50,9 @@ public class Localizer {
         return Screen.merge(versions);
     }
 
-    /** The languages of the real players, in a fixed order. Test players have no language. */
+    /**
+     * The languages of the real players, in a fixed order. Test players have no language.
+     */
     private Set<Language> languagesOf(Collection<Player> players) {
         Set<Language> used = EnumSet.noneOf(Language.class);
         players.stream()

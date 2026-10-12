@@ -39,17 +39,23 @@ public class Click {
         return user.getId();
     }
 
-    /** The texts in the language of the person who pressed the button. */
+    /**
+     * The texts in the language of the person who pressed the button.
+     */
     public Texts texts() {
         return texts;
     }
 
-    /** The message the button belongs to. Null if Telegram no longer provides it. */
+    /**
+     * The message the button belongs to. Null if Telegram no longer provides it.
+     */
     public MessageRef message() {
         return message;
     }
 
-    /** Title of the group the button was pressed in. Null in a private chat. */
+    /**
+     * Title of the group the button was pressed in. Null in a private chat.
+     */
     public String chatTitle() {
         return chatTitle;
     }
@@ -70,7 +76,9 @@ public class Click {
         return Long.parseLong(part(index));
     }
 
-    /** Short note at the top of the chat. */
+    /**
+     * Short note at the top of the chat.
+     */
     public void toast(Msg message) {
         answer(texts.get(message), false);
     }
@@ -79,7 +87,9 @@ public class Click {
         toast(Msg.of(key, args));
     }
 
-    /** Pop-up the user has to confirm. Use it when a button cannot do what was asked. */
+    /**
+     * Pop-up the user has to confirm. Use it when a button cannot do what was asked.
+     */
     public void alert(Msg message) {
         answer(texts.get(message), true);
     }
@@ -88,7 +98,9 @@ public class Click {
         alert(Msg.of(key, args));
     }
 
-    /** Opens a link instead of showing text. Returns false if Telegram refused the link. */
+    /**
+     * Opens a link instead of showing text. Returns false if Telegram refused the link.
+     */
     public boolean openLink(String url) {
         if (answered) {
             return false;
@@ -97,12 +109,16 @@ public class Click {
         return answered;
     }
 
-    /** Answers with a text that is already translated, for example right after a language change. */
+    /**
+     * Answers with a text that is already translated, for example right after a language change.
+     */
     public void toastText(String text) {
         answer(text, false);
     }
 
-    /** Answers silently if no handler answered before. */
+    /**
+     * Answers silently if no handler answered before.
+     */
     public void finish() {
         answer(null, false);
     }
