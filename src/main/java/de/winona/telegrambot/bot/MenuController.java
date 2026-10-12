@@ -25,7 +25,8 @@ import java.util.Set;
  * It reads data from the services and lets {@link MenuScreens} turn it into screens,
  * always in the language of the player it is talking to.
  */
-public class MenuController {
+public class MenuController
+{
 
     private static final String START_JOIN_PREFIX = "join_";
     private static final String START_HOW_TO_PLAY = "how";

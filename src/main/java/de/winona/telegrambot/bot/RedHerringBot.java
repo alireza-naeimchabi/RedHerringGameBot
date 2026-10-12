@@ -85,7 +85,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         boolean privateChat = message.getChat().isUserChat();
 
         if (!text.startsWith("/")) {
-            if (privateChat) {
+            if (privateChat && !gameController.onPrivateText(user, text)) {
                 menuController.onText(text, user);
             }
             return;

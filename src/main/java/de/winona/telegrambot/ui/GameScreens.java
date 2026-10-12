@@ -39,7 +39,8 @@ import static de.winona.telegrambot.ui.Theme.note;
  * messages, the scene report, the lab, the accusation and the verdict.
  * The first parameter is always the {@link Texts} of the language to write in.
  */
-public final class GameScreens {
+public final class GameScreens
+{
 
     private static final int NAME_LENGTH = 22;
     private static final int TITLE_LENGTH = 32;
@@ -298,7 +299,6 @@ public final class GameScreens {
 
     /** The scene tile the Forensic Scientist answers next, with the answers given so far. */
     public static Screen sceneTile(Texts t, Game game, HintTile tile) {
-        long chatId = game.getRoom().groupChatId();
         int number = game.getCurrentHintIndex() + 1;
 
         StringBuilder text = new StringBuilder();
@@ -309,9 +309,7 @@ public final class GameScreens {
             text.append("\n");
         }
         text.append(tileQuestion(t, game, tile));
-
-        String prefix = Callbacks.game(Callbacks.HINT, chatId, game.getCurrentHintIndex()) + Callbacks.SEPARATOR;
-        return t.text(text.toString(), CardKeyboardFactory.createOptionKeyboard(t, tile.options(), prefix));
+        return t.text(text.toString());
     }
 
     public static Screen tilesPlaced(Texts t, Game game) {
@@ -346,7 +344,8 @@ public final class GameScreens {
         return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
     }
 
-    public static Screen chooseTileToReplace(Texts t, Game game, HintTile newTile) {
+    public static Screen chooseTileToReplace(Texts t, Game game, HintTile newTile)
+    {
         long chatId = game.getRoom().groupChatId();
         StringBuilder text = new StringBuilder();
         text.append(Theme.ICON_ROUND).append(" ")
@@ -360,18 +359,17 @@ public final class GameScreens {
         List<Hint> hints = game.getHints();
         for (int i = Game.FIXED_TILES; i < hints.size(); i++) {
             buttons.add(button(subjectIcon(hints.get(i).subject()) + " " + t.tile(hints.get(i).title())
-                            + ": " + t.option(hints.get(i).choice()),
+                            + ": " + answerText(t, hints.get(i)),
                     Callbacks.game(Callbacks.REPLACE_SLOT, chatId, game.getRound(), i)));
         }
         return t.text(text.toString(), Keyboard.create().grid(buttons, 1).build());
     }
 
-    public static Screen replacementTile(Texts t, Game game, HintTile tile) {
-        long chatId = game.getRoom().groupChatId();
+    public static Screen replacementTile(Texts t, Game game, HintTile tile)
+    {
         String text = Theme.ICON_SCIENTIST + " " + bold(t.get("newtile.title")) + "\n\n"
                 + tileQuestion(t, game, tile);
-        String prefix = Callbacks.game(Callbacks.REPLACEMENT_HINT, chatId, game.getRound()) + Callbacks.SEPARATOR;
-        return t.text(text, CardKeyboardFactory.createOptionKeyboard(t, tile.options(), prefix));
+        return t.text(text);
     }
 
     public static Screen caseClosedByScientist(Texts t) {
@@ -430,26 +428,48 @@ public final class GameScreens {
         return lines.toString();
     }
 
-    private static String hintLine(Texts t, Hint hint) {
-        return subjectIcon(hint.subject()) + " " + esc(t.tile(hint.title())) + ": " + bold(t.option(hint.choice()));
+    private static String hintLine(Texts t, Hint hint)
+    {
+        return subjectIcon(hint.subject()) + " " + esc(t.tile(hint.title())) + ": " + bold(answerText(t, hint));
+    }
+
+    /** A typed answer exactly as written, a chosen option in the reader's language. Not escaped. */
+    private static String answerText(Texts t, Hint hint) {
+        return hint.typed()
+                ? t.plainName(hint.choice(), Game.MAX_ANSWER_LENGTH)
+                : t.option(hint.choice());
     }
 
     private static String subjectIcon(TileSubject subject) {
-        return subject == TileSubject.MEANS ? Theme.ICON_MEANS : Theme.ICON_CLUE;
+        return switch (subject) {
+            case MEANS -> Theme.ICON_MEANS;
+            case KEY_EVIDENCE -> Theme.ICON_CLUE;
+            case MURDERER -> Theme.ICON_PROFILE;
+        };
     }
 
     private static String cardIcon(Card card) {
         return card.type() == CardType.WEAPON ? Theme.ICON_MEANS : Theme.ICON_CLUE;
     }
 
-    private static String tileQuestion(Texts t, Game game, HintTile tile) {
-        boolean aboutMeans = tile.subject() == TileSubject.MEANS;
+    private static String tileQuestion(Texts t, Game game, HintTile tile)
+    {
+        String describes = switch (tile.subject()) {
+            case MEANS -> t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())));
+            case KEY_EVIDENCE -> t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())));
+            case MURDERER -> t.get("tile.describes.murderer", bold(name(t, game.getMurderer())));
+        };
         return subjectIcon(tile.subject()) + " " + bold(t.tile(tile.title())) + "\n"
-                + (aboutMeans
-                ? t.get("tile.describes.means", bold(t.card(game.getMurderWeapon())))
-                : t.get("tile.describes.evidence", bold(t.card(game.getKeyEvidence())))) + "\n"
-                + t.get("tile.pick");
+                + describes + "\n"
+                + t.get("tile.type", Game.MAX_ANSWER_LENGTH) + "\n"
+                + italic(t.get("tile.examples", examples(t, tile)));
     }
+
+    /** The tile's options as ideas for a typed answer. */
+    private static String examples(Texts t, HintTile tile) {
+        return tile.options().stream().map(t::option).collect(Collectors.joining(" · "));
+    }
+
 
     private static String labLines(Texts t, List<LabResult> results) {
         StringBuilder lines = new StringBuilder();

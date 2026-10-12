@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -107,8 +109,9 @@ class GameTest {
 
         List<HintTile> offered = game.startNextRound();
         assertFalse(game.isLabOpen(), "the lab waits for the new scene report");
-        assertEquals(2, offered.size());
+        assertEquals(3, offered.size(), "one means tile, one evidence tile and the murderer profile");
         assertNotEquals(offered.get(0).subject(), offered.get(1).subject());
+        assertEquals(HintDeck.MURDERER_PROFILE, offered.get(2));
 
         game.chooseOfferedTile(1);
         assertTrue(game.isReplacementPending());
@@ -120,6 +123,60 @@ class GameTest {
         assertEquals(0, game.getTestsUsedThisRound());
         assertEquals("Cause of death", game.getHints().get(0).title());
         assertEquals(offered.get(1).title(), game.getHints().get(Game.FIXED_TILES).title());
+    }
+
+    @Test
+    void theMurdererProfileCanBeGivenOncePerCase() {
+        List<HintTile> round2 = game.startNextRound();
+        assertEquals(HintDeck.MURDERER_PROFILE, round2.get(2));
+
+        game.chooseOfferedTile(2);
+        game.chooseSlotToReplace(Game.FIXED_TILES);
+        game.addReplacementHint(1);
+        Hint profile = game.getHints().get(Game.FIXED_TILES);
+        assertEquals(TileSubject.MURDERER, profile.subject());
+        assertEquals("Has been quiet", profile.choice());
+
+        List<HintTile> round3 = game.startNextRound();
+        assertEquals(2, round3.size());
+        assertFalse(round3.contains(HintDeck.MURDERER_PROFILE), "the profile is used up");
+    }
+
+    @Test
+    void playersKeepTheirSeatOrderSoNoListGivesARoleAway() {
+        assertEquals(players, new ArrayList<>(game.getRoles().keySet()));
+        List<Player> seatsWithoutScientist = new ArrayList<>(players);
+        seatsWithoutScientist.remove(game.getForensicScientist());
+        assertEquals(seatsWithoutScientist, game.getSuspects());
+
+        Set<Integer> murdererPositions = new HashSet<>();
+        for (int i = 0; i < 200; i++) {
+            Game another = new Game(new Room("TEST", -1, "Group", HOST, Instant.now()), players, null, null);
+            murdererPositions.add(another.getSuspects().indexOf(another.getMurderer()));
+        }
+        assertEquals(4, murdererPositions.size(), "the murderer can sit anywhere in the suspect list");
+    }
+
+    @Test
+    void theMurdererCanAccuseButNeverDecidesTheCase() {
+        Hand real = game.getMurdererHand();
+        Hand framed = game.getScapegoatHand();
+
+        assertTrue(game.canAccuse(murderer.userId()), "the button gives nothing away");
+        assertEquals(AccusationResult.WRONG,
+                game.accuse(murderer.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3)),
+                "the murderer cannot convict the player they framed");
+        assertTrue(game.hasAccused(murderer.userId()));
+        assertFalse(game.allInvestigatorsDone(), "the murderer's attempt does not count");
+        assertEquals(AccusationResult.SOLVED,
+                game.accuse(bystander.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+    }
+
+    @Test
+    void theMurdererCannotGiveUpTheCaseOnPurpose() {
+        Hand real = game.getMurdererHand();
+        assertEquals(AccusationResult.WRONG,
+                game.accuse(murderer.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
     }
 
     @Test

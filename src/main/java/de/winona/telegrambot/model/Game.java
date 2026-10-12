@@ -26,6 +26,9 @@ public class Game
     public static final int FIXED_TILES = 1;
     public static final int LAB_TESTS_PER_ROUND = 1;
 
+    /** A typed answer of the Forensic Scientist may be at most this long. */
+    public static final int MAX_ANSWER_LENGTH = 60;
+
     private final Room room;
     private final boolean practice;
     private final Map<Player, Role> roles = new LinkedHashMap<>();
@@ -73,9 +76,16 @@ public class Game
             shuffled.add(index, forcedPlayer);
         }
 
+        // The shuffled order decides the roles. The players are stored in their seat order,
+        // otherwise the murderer would always be listed first among the suspects.
+        Map<Player, Role> drawn = new HashMap<>();
         for (int i = 0; i < shuffled.size(); i++)
         {
-            roles.put(shuffled.get(i), roleForIndex(i));
+            drawn.put(shuffled.get(i), roleForIndex(i));
+        }
+        for (Player player : players)
+        {
+            roles.put(player, drawn.get(player));
         }
 
         CardDeck deck = new CardDeck();
@@ -272,7 +282,11 @@ public class Game
     public List<HintTile> startNextRound() {
         round++;
         testsInCurrentRound.clear();
-        offeredTiles = hintDeck.drawOffer();
+        List<HintTile> offer = new ArrayList<>(hintDeck.drawOffer());
+        if (hints.stream().noneMatch(hint -> hint.subject() == TileSubject.MURDERER)) {
+            offer.add(HintDeck.MURDERER_PROFILE);
+        }
+        offeredTiles = offer;
         pendingTile = null;
         pendingSlot = null;
         return offeredTiles;
@@ -305,12 +319,40 @@ public class Game
         pendingSlot = slot;
     }
 
-    public void addReplacementHint(int optionIndex) {
+    public void addReplacementHint(int optionIndex)
+    {
         hintTiles.set(pendingSlot, pendingTile);
         hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex),
                 pendingTile.subject()));
         pendingTile = null;
         pendingSlot = null;
+    }
+
+    // ---------------------------------------------------------------- Typed answers
+
+    /** True while the Forensic Scientist has a scene tile open that they answer by typing. */
+    public boolean isWaitingForTypedAnswer()
+    {
+        return isCrimeSealed() && (getCurrentHintTile().isPresent() || hasPendingSlot());
+    }
+
+    /** The scene tile the Forensic Scientist answers right now. */
+    public HintTile getOpenTile() {
+        return hasPendingSlot() ? pendingTile : getCurrentHintTile().orElseThrow();
+    }
+
+    /** Saves a typed answer: as the next answer in round 1, or in place of an old one in rounds 2 and 3. */
+    public void addTypedAnswer(String answer)
+    {
+        if (hasPendingSlot()) {
+            hintTiles.set(pendingSlot, pendingTile);
+            hints.set(pendingSlot, new Hint(pendingTile.title(), answer, pendingTile.subject(), true));
+            pendingTile = null;
+            pendingSlot = null;
+        } else {
+            HintTile tile = hintTiles.get(hints.size());
+            hints.add(new Hint(tile.title(), answer, tile.subject(), true));
+        }
     }
 
     // ---------------------------------------------------------------- Forensic lab
@@ -338,7 +380,8 @@ public class Game
      * Sends one card to the lab and uses the tester's test for this round.
      * The lab cannot tell a real trace from a planted one.
      */
-    public LabResult testCard(long testerId, Player owner, Card card) {
+    public LabResult testCard(long testerId, Player owner, Card card)
+    {
         Player tester = getPlayer(testerId).orElseThrow();
         testsInCurrentRound.merge(testerId, 1, Integer::sum);
         LabResult result = new LabResult(round, tester, owner, card, leavesTrace(card));
@@ -346,7 +389,8 @@ public class Game
         return result;
     }
 
-    private boolean leavesTrace(Card card) {
+    private boolean leavesTrace(Card card)
+    {
         return card.equals(murderWeapon) || card.equals(keyEvidence)
                 || card.equals(plantedMeans) || card.equals(plantedClue);
     }
@@ -379,8 +423,17 @@ public class Game
                 && !usedAccusations.contains(userId);
     }
 
+    /**
+     * Judges an accusation and uses the accuser's single attempt.
+     * The murderer may accuse too, so that pressing the button gives nothing away,
+     * but their accusation is always wrong: they cannot convict the player they framed
+     * themselves, and they cannot give up the case on purpose.
+     */
     public AccusationResult accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
         usedAccusations.add(accuserId);
+        if (accuserId == getMurderer().userId()) {
+            return AccusationResult.WRONG;
+        }
         if (suspect.equals(getMurderer()) && weapon.equals(murderWeapon) && evidence.equals(keyEvidence)) {
             return AccusationResult.SOLVED;
         }

@@ -345,8 +345,8 @@ class BilingualBotTest {
         press(cast.scientist, tile, tile.buttons().get(1).getCallbackData());
         assertTrue(tile.html.contains(FA.get("replace.ask")), tile.html);
         press(cast.scientist, tile, tile.buttons().get(0).getCallbackData());
+        say(cast.scientist, FA.option("Wiped away"));
         assertTrue(tile.html.contains(FA.get("newtile.title")), tile.html);
-        press(cast.scientist, tile, tile.buttons().get(0).getCallbackData());
         assertTrue(telegram.last(GROUP).html.contains(FA.get("report.sub", code, 2, 3)), telegram.last(GROUP).html);
         assertTrue(telegram.last(GROUP).html.contains(FA.get("report.lab")));
 
@@ -511,6 +511,15 @@ class BilingualBotTest {
         return languages.languageOf(user.getId()) == Language.PERSIAN ? FA : EN;
     }
 
+    /** The first idea the open scene tile suggests, as the scientist reads it. */
+    private String firstIdea(User scientist) {
+        String html = telegram.last(scientist.getId()).html;
+        String ideas = html.lines().filter(line -> line.contains(" · ")).findFirst().orElseThrow()
+                .replaceAll("<[^>]+>", "")
+                .replaceAll("[\u200e\u200f\u2066-\u2069]", "");
+        return ideas.substring(ideas.indexOf(": ") + 2, ideas.indexOf(" · "));
+    }
+
     private void say(User user, String text) {
         bot.consume(FakeTelegram.text(user, user.getId(), null, text));
     }
@@ -586,34 +595,62 @@ class BilingualBotTest {
     }
 
     /** The murderer commits the crime and the Forensic Scientist answers all six tiles. */
-    private Cast playToTheReport() {
+    private Cast playToTheReport()
+    {
         User scientist = playerWithRole(Role.FORENSIC_SCIENTIST);
         User murderer = playerWithRole(Role.MURDERER);
-        List<User> investigators = table.stream().filter(user -> user != scientist && user != murderer).toList();
-        List<User> suspects = table.stream().filter(user -> user != scientist).toList();
+
+        List<User> investigators = table.stream()
+                .filter(user -> user != scientist && user != murderer)
+                .toList();
+
+        List<User> suspects = table.stream()
+                .filter(user -> user != scientist)
+                .toList();
 
         Texts own = t(murderer);
-        Shown choice = telegram.find(murderer.getId(), own.get("murder.means.title")).orElseThrow();
+        Shown choice = telegram.find(murderer.getId(), own.get("murder.means.title"))
+                .orElseThrow();
+
         assertEquals(4, choice.buttons().size());
+
         for (int step = 0; step < 5; step++) {
             press(murderer, choice, choice.buttons().get(0).getCallbackData());
         }
+
         assertTrue(choice.html.contains(own.get("sealed.title")), choice.html);
         assertFalse(choice.html.contains(DIVIDER));
 
         Texts scientistTexts = t(scientist);
-        Shown tile = telegram.find(scientist.getId(), scientistTexts.get("tile.heading", 1, 6)).orElseThrow();
-        assertTrue(telegram.find(scientist.getId(), scientistTexts.get("sci.solution.title")).isPresent());
+
+        assertTrue(telegram.find(
+                scientist.getId(),
+                scientistTexts.get("tile.heading", 1, 6)
+        ).isPresent());
+
+        assertTrue(telegram.find(
+                scientist.getId(),
+                scientistTexts.get("sci.solution.title")
+        ).isPresent());
+
+        // The scientist types one of the suggested ideas, in their own language.
         for (int i = 0; i < 6; i++) {
-            press(scientist, tile, tile.buttons().get(0).getCallbackData());
+            say(scientist, firstIdea(scientist));
         }
-        assertTrue(tile.html.contains(scientistTexts.get("placed.title", 1)), tile.html);
+
+        assertTrue(telegram.find(
+                scientist.getId(),
+                scientistTexts.get("placed.title", 1)
+        ).isPresent());
 
         Shown report = telegram.chat(GROUP).stream()
                 .filter(shown -> shown.buttons().stream()
-                        .anyMatch(button -> ("LT:" + GROUP).equals(button.getCallbackData())))
+                        .anyMatch(button ->
+                                ("LT:" + GROUP).equals(button.getCallbackData())))
                 .reduce((first, second) -> second)
-                .orElseThrow(() -> new AssertionError("no scene report in the group"));
+                .orElseThrow(() ->
+                        new AssertionError("no scene report in the group"));
+
         return new Cast(scientist, murderer, investigators, suspects, report);
     }
 

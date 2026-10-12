@@ -85,6 +85,7 @@ class TextsTest {
             List<HintTile> tiles = new ArrayList<>(deck.drawStartTiles());
             tiles.addAll(deck.drawOffer());
             tiles.addAll(deck.drawOffer());
+            tiles.add(HintDeck.MURDERER_PROFILE);
             for (HintTile tile : tiles) {
                 assertEquals(tile.title(), english.tile(tile.title()));
                 if (persian.tile(tile.title()).equals(tile.title())) {
