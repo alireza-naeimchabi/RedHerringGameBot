@@ -1,52 +1,40 @@
 package de.winona.telegrambot.util;
 
 import de.winona.telegrambot.model.Card;
+import de.winona.telegrambot.ui.Keyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import java.util.Map;
-
+/** Builds the buttons for choosing a card or a scene tile option. */
 public class CardKeyboardFactory {
+
+    /** Cards and options are shown in two columns, so four cards fit on one phone screen. */
+    public static final int COLUMNS = 2;
 
     private CardKeyboardFactory() {
     }
 
     public static InlineKeyboardMarkup createCardKeyboard(List<Card> cards, String callbackPrefix) {
-        List<String> names = cards.stream().map(Card::name).toList();
-        return createTextKeyboard(names, callbackPrefix);
+        return Keyboard.create().grid(cardButtons(cards, callbackPrefix), COLUMNS).build();
     }
 
     public static InlineKeyboardMarkup createTextKeyboard(List<String> texts, String callbackPrefix) {
-        List<InlineKeyboardRow> rows = new ArrayList<>();
-
-        for (int i = 0; i < texts.size(); i++) {
-            InlineKeyboardButton button = InlineKeyboardButton.builder()
-                    .text(texts.get(i))
-                    .callbackData(callbackPrefix + i)
-                    .build();
-            rows.add(new InlineKeyboardRow(button));
-        }
-
-        return InlineKeyboardMarkup.builder()
-                .keyboard(rows)
-                .build();
+        return Keyboard.create().grid(textButtons(texts, callbackPrefix), COLUMNS).build();
     }
 
-    public static InlineKeyboardMarkup createKeyboard(Map<String, String> buttons) {
-        List<InlineKeyboardRow> rows = new ArrayList<>();
+    public static List<InlineKeyboardButton> cardButtons(List<Card> cards, String callbackPrefix) {
+        return textButtons(cards.stream().map(Card::name).toList(), callbackPrefix);
+    }
 
-        buttons.forEach((text, data) -> rows.add(new InlineKeyboardRow(
-                InlineKeyboardButton.builder()
-                        .text(text)
-                        .callbackData(data)
-                        .build())));
-
-        return InlineKeyboardMarkup.builder()
-                .keyboard(rows)
-                .build();
+    /** One button per text. The callback data is the prefix followed by the index of the text. */
+    public static List<InlineKeyboardButton> textButtons(List<String> texts, String callbackPrefix) {
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        for (int i = 0; i < texts.size(); i++) {
+            buttons.add(Keyboard.button(texts.get(i), callbackPrefix + i));
+        }
+        return buttons;
     }
 }

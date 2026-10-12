@@ -38,3 +38,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Bot data (player statistics) ###
+/data/

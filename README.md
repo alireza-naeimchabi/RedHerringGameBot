@@ -1,3 +1,55 @@
+# Deception – Telegram-Spielbot
+
+Ein Social-Deduction-Spiel für Telegram-Gruppen (4–7 Spieler), umgesetzt in reinem Java mit
+`telegrambots-longpolling`. Fan-Adaption des Brettspiels *Deception: Murder in Hong Kong*,
+nicht mit dem Verlag verbunden. Die Oberfläche des Bots ist komplett auf Englisch.
+
+## Bedienung
+
+**Privater Chat (Dashboard):** `/start` öffnet das Dashboard mit Buttons für
+*Create Game Room*, *Join Game Room*, *My Game Rooms*, *How to Play*, *Game Roles*,
+*My Statistics*, *Leaderboard* und *Profile*. Das Menü ändert immer dieselbe Nachricht,
+statt neue zu schicken.
+
+**Gruppe (Spiel):**
+
+| Befehl | Wirkung |
+|---|---|
+| `/newgame` | Raum mit 4-stelligem Code öffnen, Raumkarte posten |
+| `/join`, `/leave` | Platz nehmen / Platz freigeben (auch per Button oder Code im privaten Chat) |
+| `/startgame` | Fall eröffnen (nur Host, ab 4 Spielern) |
+| `/accuse` | Anklage in 3 Schritten (auch per Button *Solve the Crime*) |
+| `/nextround` | Nächste Runde (nur Forensic Scientist) |
+| `/board`, `/room` | Evidence Board bzw. Raumkarte/Scene Report erneut zeigen |
+| `/endgame` | Raum schließen oder laufenden Fall abbrechen |
+
+Zum Testen allein: `/addtestplayers`, danach `/testmurderer`, `/testscientist` oder
+`/testinvestigator`. Solche Übungsfälle zählen nicht für die Statistik.
+
+## Struktur
+
+| Paket | Aufgabe |
+|---|---|
+| `bot` | `RedHerringBot` verteilt Updates an `MenuController`, `RoomController`, `GameController`. `Messenger` ist die einzige Klasse, die mit Telegram spricht. |
+| `ui` | Reine Darstellung: `Theme` (Texte, Icons), `Screen`, `Keyboard`, `Callbacks`, `MenuScreens`, `GameScreens`, `Banner`. Keine Spiellogik. |
+| `model` | Spielregeln und Daten: `Game`, `Lobby`, `Room`, Karten, Hinweise, `PlayerStats`. |
+| `service` | Zustand: `LobbyService` (Räume, Codes, Ablauf nach 2 Stunden), `GameService`, `StatsService`. |
+
+Statistik und Rangliste werden in `data/player-stats.properties` gespeichert (nicht im Git).
+Die Banner liegen in `src/main/resources/ui` und lassen sich mit `tools/make_banners.py` neu erzeugen
+(benötigt Python mit Playwright und Pillow).
+
+## Tests
+
+```
+mvn test
+```
+
+Die Tests spielen den Bot über einen simulierten Telegram-Client durch (Dashboard, Räume, ein
+kompletter Fall, Statistik) und prüfen jede Nachricht gegen die Telegram-Limits.
+
+---
+
 # Java Telegram-Bot Demo
 
 Dieses Demo-Projekt veranschaulicht die grundlegende Funktionsweise eines **Telegram Bots** in **reinem Java** (Standard Main-Methode ohne Spring Boot Framework) unter Verwendung der offiziellen Java-Bibliothek `telegrambots-longpolling`.
