@@ -1,6 +1,8 @@
 package de.winona.telegrambot.model;
 
-/** The record of one detective across all closed cases. */
+/**
+ * The record of one detective across all closed cases.
+ */
 public class PlayerStats {
 
     private final long userId;
@@ -30,7 +32,9 @@ public class PlayerStats {
         this.escapes = escapes;
     }
 
-    /** Adds one closed case to this record. */
+    /**
+     * Adds one closed case to this record.
+     */
     public void addGame(String currentName, Role role, boolean won, boolean solvedTheCase) {
         name = currentName;
         games++;

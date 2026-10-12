@@ -1,14 +1,8 @@
 package de.winona.telegrambot.model;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 
-import static de.winona.telegrambot.model.TileSubject.KEY_EVIDENCE;
-import static de.winona.telegrambot.model.TileSubject.MEANS;
-import static de.winona.telegrambot.model.TileSubject.MURDERER;
+import static de.winona.telegrambot.model.TileSubject.*;
 
 /**
  * The scene tiles the Forensic Scientist answers.
@@ -21,7 +15,9 @@ public class HintDeck {
     public static final int EVIDENCE_TILES_AT_START = 3;
     public static final int TILES_OFFERED_PER_ROUND = 2;
 
-    /** Deliberately general: each answer fits two card families, about a third of all means. */
+    /**
+     * Deliberately general: each answer fits two card families, about a third of all means.
+     */
     private static final HintTile CAUSE_OF_DEATH = new HintTile("Cause of death", MEANS,
             List.of("Bleeding wound", "Blunt force", "No visible wound"));
 
@@ -76,7 +72,9 @@ public class HintDeck {
         return new ArrayDeque<>(copy);
     }
 
-    /** Cause of death always comes first, then tiles about the means, then about the key evidence. */
+    /**
+     * Cause of death always comes first, then tiles about the means, then about the key evidence.
+     */
     public List<HintTile> drawStartTiles() {
         List<HintTile> tiles = new ArrayList<>();
         tiles.add(CAUSE_OF_DEATH);

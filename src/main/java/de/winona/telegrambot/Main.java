@@ -9,14 +9,12 @@ import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
  * Haupteinstiegspunkt der Telegram Bot Anwendung.
  * Liest die Konfiguration aus Umgebungsvariablen und startet die Long-Polling-Anwendung.
  */
-public class Main
-{
+public class Main {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private static final String ENV_BOT_TOKEN = "TELEGRAM_BOT_TOKEN";
 
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         String botToken = fetchBotToken();
 
         log.info("Starte Telegram Bot...");

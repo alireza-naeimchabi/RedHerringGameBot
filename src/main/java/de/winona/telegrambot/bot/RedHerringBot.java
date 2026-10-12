@@ -25,8 +25,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
  * the dashboard ({@link MenuController}), the rooms ({@link RoomController})
  * or the running case ({@link GameController}).
  */
-public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
-{
+public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(RedHerringBot.class);
 
@@ -41,7 +40,9 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
         messenger.registerCommands();
     }
 
-    /** For tests: their own Telegram client and statistics file, language choices kept in memory. */
+    /**
+     * For tests: their own Telegram client and statistics file, language choices kept in memory.
+     */
     public RedHerringBot(TelegramClient telegramClient, StatsService statsService) {
         this(telegramClient, statsService, LanguageService.inMemory());
     }
@@ -60,8 +61,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
     }
 
     @Override
-    public void consume(Update update)
-    {
+    public void consume(Update update) {
         try {
             if (update.hasCallbackQuery()) {
                 handleCallback(update.getCallbackQuery());
@@ -137,7 +137,8 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer
             case "/testmurderer" -> roomController.openCaseByCommand(chatId, user, Role.MURDERER);
             case "/testscientist" -> roomController.openCaseByCommand(chatId, user, Role.FORENSIC_SCIENTIST);
             case "/testinvestigator" -> roomController.openCaseByCommand(chatId, user, Role.INVESTIGATOR);
-            default -> { }
+            default -> {
+            }
         }
     }
 

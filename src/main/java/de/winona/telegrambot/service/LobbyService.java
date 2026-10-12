@@ -8,14 +8,9 @@ import de.winona.telegrambot.util.RoomCodeGenerator;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
-public class LobbyService
-{
+public class LobbyService {
 
     private static final int REMEMBERED_ENDED_ROOMS = 500;
 
@@ -37,7 +32,9 @@ public class LobbyService
         this.clock = clock;
     }
 
-    /** Opens a room for a group. Empty if the group already has an open room. */
+    /**
+     * Opens a room for a group. Empty if the group already has an open room.
+     */
     public Optional<Lobby> createLobby(long chatId, String groupTitle, Player host) {
         if (getLobby(chatId).isPresent()) {
             return Optional.empty();
@@ -81,7 +78,9 @@ public class LobbyService
         }
     }
 
-    /** Tells why a code that once existed can no longer be joined. */
+    /**
+     * Tells why a code that once existed can no longer be joined.
+     */
     public Optional<RoomEnd> endOf(String code) {
         return Optional.ofNullable(endedRooms.get(code));
     }

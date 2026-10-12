@@ -4,7 +4,9 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.function.Predicate;
 
-/** Creates short room codes without letters and digits that are easy to confuse (0/O, 1/I). */
+/**
+ * Creates short room codes without letters and digits that are easy to confuse (0/O, 1/I).
+ */
 public final class RoomCodeGenerator {
 
     public static final int CODE_LENGTH = 4;

@@ -21,15 +21,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,7 +33,9 @@ public class FakeTelegram {
 
     public static final String BOT_USERNAME = "TestCaseBot";
 
-    /** One message as a chat currently shows it. */
+    /**
+     * One message as a chat currently shows it.
+     */
     public static final class Shown {
         public final long chatId;
         public final int messageId;
@@ -68,7 +62,9 @@ public class FakeTelegram {
         }
     }
 
-    /** How the bot answered the last button press. */
+    /**
+     * How the bot answered the last button press.
+     */
     public record Answer(String text, boolean alert, String url) {
     }
 
@@ -104,7 +100,9 @@ public class FakeTelegram {
         return client;
     }
 
-    /** A user who never started the bot: private messages to them fail, as in real Telegram. */
+    /**
+     * A user who never started the bot: private messages to them fail, as in real Telegram.
+     */
     public void blockPrivateChat(long userId) {
         blockedChats.add(userId);
     }
@@ -302,7 +300,9 @@ public class FakeTelegram {
         return chat;
     }
 
-    /** A text message from a user. Use the user's own id as chat id for a private chat. */
+    /**
+     * A text message from a user. Use the user's own id as chat id for a private chat.
+     */
     public static Update text(User from, long chatId, String groupTitle, String text) {
         Message message = new Message();
         message.setMessageId(1);
@@ -314,7 +314,9 @@ public class FakeTelegram {
         return update;
     }
 
-    /** A press on a button with the given callback data under the given message. */
+    /**
+     * A press on a button with the given callback data under the given message.
+     */
     public Update press(User from, Shown shown, String groupTitle, String data) {
         lastAnswer = null;
         CallbackQuery callback = new CallbackQuery();
@@ -343,7 +345,9 @@ public class FakeTelegram {
         return shown.get(shown.size() - 1);
     }
 
-    /** The newest message in a chat whose text contains the given part. */
+    /**
+     * The newest message in a chat whose text contains the given part.
+     */
     public Optional<Shown> find(long chatId, String textPart) {
         List<Shown> shown = chat(chatId);
         for (int i = shown.size() - 1; i >= 0; i--) {

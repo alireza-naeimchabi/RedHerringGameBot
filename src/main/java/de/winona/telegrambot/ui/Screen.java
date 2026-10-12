@@ -16,28 +16,34 @@ import java.util.stream.Collectors;
  */
 public record Screen(Banner banner, Language language, String html, InlineKeyboardMarkup keyboard) {
 
-    /** Telegram's limit for the text under a photo. */
+    /**
+     * Telegram's limit for the text under a photo.
+     */
     public static final int MAX_CAPTION_LENGTH = 1024;
-    /** Telegram's limit for a text message. */
-    public static final int MAX_TEXT_LENGTH = 4096;
 
     private static final String LANGUAGE_DIVIDER = "\n\n┄┄┄┄┄┄┄┄┄┄\n\n";
     private static final String LABEL_DIVIDER = " · ";
-    /** Longer labels do not fit next to each other on a phone. */
+    /**
+     * Longer labels do not fit next to each other on a phone.
+     */
     private static final int MAX_LABEL_LENGTH_IN_SHARED_ROW = 20;
 
     public boolean hasBanner() {
         return banner != null;
     }
 
-    /** Number of characters Telegram counts: the text without HTML tags, entities counted once. */
+    /**
+     * Number of characters Telegram counts: the text without HTML tags, entities counted once.
+     */
     public int visibleLength() {
         return html.replaceAll("<[^>]+>", "")
                 .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
                 .length();
     }
 
-    /** True if the text is short enough to be shown as the caption of the banner. */
+    /**
+     * True if the text is short enough to be shown as the caption of the banner.
+     */
     public boolean fitsCaption() {
         return visibleLength() <= MAX_CAPTION_LENGTH;
     }
@@ -109,12 +115,16 @@ public record Screen(Banner banner, Language language, String html, InlineKeyboa
                 .build();
     }
 
-    /** Removes the invisible characters that only steer the direction of text. */
+    /**
+     * Removes the invisible characters that only steer the direction of text.
+     */
     private static String withoutDirectionMarks(String text) {
         return text.replaceAll("\\p{Cf}", "");
     }
 
-    /** "🔬 Lab Test" and "🔬 آزمایش" become "🔬 Lab Test · آزمایش": the icon is shown once. */
+    /**
+     * "🔬 Lab Test" and "🔬 آزمایش" become "🔬 Lab Test · آزمایش": the icon is shown once.
+     */
     private static String withoutSharedIcon(String label, String other) {
         int space = label.indexOf(' ');
         if (space > 0) {

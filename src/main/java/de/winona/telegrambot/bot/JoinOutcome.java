@@ -3,7 +3,9 @@ package de.winona.telegrambot.bot;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.model.Lobby;
 
-/** What happened when a player tried to take a seat with a room code. */
+/**
+ * What happened when a player tried to take a seat with a room code.
+ */
 public enum JoinOutcome {
     JOINED("toast.seated"),
     ALREADY_SEATED("toast.already_seated"),
@@ -25,7 +27,9 @@ public enum JoinOutcome {
         return this == JOINED || this == ALREADY_SEATED;
     }
 
-    /** A full sentence that explains the outcome, to be translated for whoever reads it. */
+    /**
+     * A full sentence that explains the outcome, to be translated for whoever reads it.
+     */
     public Msg message(String code) {
         return Msg.of(messageKey, code, Lobby.MAX_PLAYERS);
     }

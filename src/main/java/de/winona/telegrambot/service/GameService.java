@@ -10,8 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class GameService
-{
+public class GameService {
 
     private final Map<Long, Game> games = new HashMap<>();
 
@@ -21,8 +20,7 @@ public class GameService
         return game;
     }
 
-    public Optional<Game> getGame(long chatId)
-    {
+    public Optional<Game> getGame(long chatId) {
         return Optional.ofNullable(games.get(chatId));
     }
 

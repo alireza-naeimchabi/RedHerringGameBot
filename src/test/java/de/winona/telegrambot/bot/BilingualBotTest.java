@@ -14,19 +14,11 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * English and Persian side by side: choosing a language, keeping it, and playing together
@@ -511,7 +503,9 @@ class BilingualBotTest {
         return languages.languageOf(user.getId()) == Language.PERSIAN ? FA : EN;
     }
 
-    /** The first idea the open scene tile suggests, as the scientist reads it. */
+    /**
+     * The first idea the open scene tile suggests, as the scientist reads it.
+     */
     private String firstIdea(User scientist) {
         String html = telegram.last(scientist.getId()).html;
         String ideas = html.lines().filter(line -> line.contains(" · ")).findFirst().orElseThrow()
@@ -547,7 +541,9 @@ class BilingualBotTest {
                 .orElseThrow(() -> new AssertionError("no button " + callbackData + " under: " + shown.html));
     }
 
-    /** The room card is the group message with the join button, whatever language it is written in. */
+    /**
+     * The room card is the group message with the join button, whatever language it is written in.
+     */
     private Shown roomCard() {
         List<Shown> shown = telegram.chat(GROUP);
         for (int i = shown.size() - 1; i >= 0; i--) {
@@ -579,7 +575,9 @@ class BilingualBotTest {
         return code;
     }
 
-    /** Who plays what, read from each player's private briefing in their own language. */
+    /**
+     * Who plays what, read from each player's private briefing in their own language.
+     */
     private record Cast(User scientist, User murderer, List<User> investigators, List<User> suspects, Shown report) {
     }
 
@@ -594,9 +592,10 @@ class BilingualBotTest {
                 .orElseThrow(() -> new AssertionError("nobody is " + role));
     }
 
-    /** The murderer commits the crime and the Forensic Scientist answers all six tiles. */
-    private Cast playToTheReport()
-    {
+    /**
+     * The murderer commits the crime and the Forensic Scientist answers all six tiles.
+     */
+    private Cast playToTheReport() {
         User scientist = playerWithRole(Role.FORENSIC_SCIENTIST);
         User murderer = playerWithRole(Role.MURDERER);
 
@@ -654,7 +653,9 @@ class BilingualBotTest {
         return new Cast(scientist, murderer, investigators, suspects, report);
     }
 
-    /** The murderer chose their first means card and first clue card, so the solution is known. */
+    /**
+     * The murderer chose their first means card and first clue card, so the solution is known.
+     */
     private void accuseCorrectly(User accuser, Cast cast) {
         press(accuser, cast.report, "AC:" + GROUP);
         Shown flow = telegram.last(GROUP);
@@ -664,7 +665,9 @@ class BilingualBotTest {
         press(accuser, flow, flow.buttons().get(0).getCallbackData());
     }
 
-    /** The text a reader sees, without tags and without the things that are Latin by nature. */
+    /**
+     * The text a reader sees, without tags and without the things that are Latin by nature.
+     */
     private String visible(Shown shown) {
         String text = shown.html
                 .replaceAll("<code>[^<]*</code>", "")
@@ -682,7 +685,9 @@ class BilingualBotTest {
         return text;
     }
 
-    /** No English words, Persian digits, and every line running right to left. */
+    /**
+     * No English words, Persian digits, and every line running right to left.
+     */
     private void assertPersianOnly(Shown shown, String where) {
         if (shown.html.isEmpty()) {
             return; // artwork without a caption

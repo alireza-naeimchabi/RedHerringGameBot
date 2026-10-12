@@ -2,12 +2,16 @@ package de.winona.telegrambot.i18n;
 
 import java.util.Arrays;
 
-/** The languages the bot speaks. The code is what gets stored, so it must never change. */
+/**
+ * The languages the bot speaks. The code is what gets stored, so it must never change.
+ */
 public enum Language {
     ENGLISH("en", "English", "🇬🇧", false),
     PERSIAN("fa", "فارسی", "🇮🇷", true);
 
-    /** Used for everyone who has not chosen a language. */
+    /**
+     * Used for everyone who has not chosen a language.
+     */
     public static final Language DEFAULT = ENGLISH;
 
     private final String code;
@@ -26,7 +30,9 @@ public enum Language {
         return code;
     }
 
-    /** The name of the language in the language itself. */
+    /**
+     * The name of the language in the language itself.
+     */
     public String nativeName() {
         return nativeName;
     }
@@ -39,7 +45,9 @@ public enum Language {
         return rightToLeft;
     }
 
-    /** Finds a language by its stored code. Unknown codes give the default language. */
+    /**
+     * Finds a language by its stored code. Unknown codes give the default language.
+     */
     public static Language fromCode(String code) {
         return Arrays.stream(values())
                 .filter(language -> language.code.equalsIgnoreCase(code))

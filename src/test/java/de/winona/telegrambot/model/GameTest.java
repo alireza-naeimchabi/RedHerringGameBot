@@ -9,12 +9,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-/** The rules of the red herring and the forensic lab, without any chat around them. */
+/**
+ * The rules of the red herring and the forensic lab, without any chat around them.
+ */
 class GameTest {
 
     private static final Player HOST = new Player(1, "Host");
@@ -81,7 +80,7 @@ class GameTest {
         }
 
         assertEquals(List.of(game.getMurderWeapon(), game.getKeyEvidence(),
-                game.getPlantedMeans(), game.getPlantedClue()).stream().sorted(this::byName).toList(),
+                        game.getPlantedMeans(), game.getPlantedClue()).stream().sorted(this::byName).toList(),
                 withTrace.stream().sorted(this::byName).toList());
         assertEquals(round, game.getRound());
     }

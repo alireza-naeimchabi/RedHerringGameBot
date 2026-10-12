@@ -13,20 +13,14 @@ import de.winona.telegrambot.ui.Screen;
 import de.winona.telegrambot.util.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * The private dashboard: home, rooms, rules, roles, statistics, leaderboard, profile and language.
  * It reads data from the services and lets {@link MenuScreens} turn it into screens,
  * always in the language of the player it is talking to.
  */
-public class MenuController
-{
+public class MenuController {
 
     private static final String START_JOIN_PREFIX = "join_";
     private static final String START_HOW_TO_PLAY = "how";
@@ -38,7 +32,9 @@ public class MenuController
     private final StatsService statsService;
     private final RoomController roomController;
     private final GameController gameController;
-    /** Players who tapped "Join Game Room" and are expected to send a code next. */
+    /**
+     * Players who tapped "Join Game Room" and are expected to send a code next.
+     */
     private final Set<Long> waitingForCode = new HashSet<>();
 
     public MenuController(Messenger messenger, Localizer localizer, LobbyService lobbyService,
@@ -55,7 +51,9 @@ public class MenuController
 
     // ---------------------------------------------------------------- Commands and text (private chat)
 
-    /** Handles a command in the private chat. Returns false if the command is unknown. */
+    /**
+     * Handles a command in the private chat. Returns false if the command is unknown.
+     */
     public boolean onCommand(String command, String argument, User user) {
         waitingForCode.remove(user.getId());
         Texts t = localizer.textsFor(user.getId());
@@ -95,7 +93,9 @@ public class MenuController
         }
     }
 
-    /** Handles plain text in the private chat: a room code, if one is expected or it looks like one. */
+    /**
+     * Handles plain text in the private chat: a room code, if one is expected or it looks like one.
+     */
     public void onText(String text, User user) {
         Texts t = localizer.textsFor(user.getId());
         boolean expected = waitingForCode.contains(user.getId());
@@ -150,7 +150,9 @@ public class MenuController
         }
     }
 
-    /** Stores the chosen language and shows the dashboard in it right away. */
+    /**
+     * Stores the chosen language and shows the dashboard in it right away.
+     */
     private void setLanguage(Click click, String languageCode) {
         Optional<Language> chosen = Arrays.stream(Language.values())
                 .filter(language -> language.code().equals(languageCode))
@@ -247,7 +249,9 @@ public class MenuController
                 statsService.rankOf(user.getId()), roomsOf(user.getId()).size());
     }
 
-    /** All rooms the player sits in or hosts. Running cases come first. */
+    /**
+     * All rooms the player sits in or hosts. Running cases come first.
+     */
     private List<RoomSummary> roomsOf(long userId) {
         List<RoomSummary> rooms = new ArrayList<>();
         gameService.gamesOf(userId).forEach(game -> rooms.add(RoomSummary.of(game)));

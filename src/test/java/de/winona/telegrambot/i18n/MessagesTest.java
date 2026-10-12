@@ -10,17 +10,19 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-/** Keeps the translation files complete and consistent with each other. */
+/**
+ * Keeps the translation files complete and consistent with each other.
+ */
 class MessagesTest {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\d}");
     private static final Pattern TAG = Pattern.compile("</?[a-z]+>");
     private static final List<String> PLAIN_TEXT_KEYS = List.of("btn.", "nav.", "err.", "toast.", "cmd.");
-    /** Texts that are rightly the same in every language. */
+    /**
+     * Texts that are rightly the same in every language.
+     */
     private static final Set<String> NOT_TRANSLATED = Set.of("home.rank_line");
 
     private final Messages messages = Messages.get();

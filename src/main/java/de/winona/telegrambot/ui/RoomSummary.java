@@ -7,7 +7,9 @@ import de.winona.telegrambot.model.Room;
 
 import java.util.List;
 
-/** What the menu needs to know about a room, whether it is still a lobby or already a running case. */
+/**
+ * What the menu needs to know about a room, whether it is still a lobby or already a running case.
+ */
 public record RoomSummary(Room room, List<Player> players, boolean inProgress, int round) {
 
     public static RoomSummary of(Lobby lobby) {

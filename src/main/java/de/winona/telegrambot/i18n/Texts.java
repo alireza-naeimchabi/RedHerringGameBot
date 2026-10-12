@@ -82,7 +82,9 @@ public final class Texts {
         return String.valueOf(arg);
     }
 
-    /** A whole number in the digits of the language, for example 12 or ۱۲. */
+    /**
+     * A whole number in the digits of the language, for example 12 or ۱۲.
+     */
     public String number(long value) {
         String digits = Long.toString(value);
         if (!language.isRightToLeft()) {
@@ -101,7 +103,9 @@ public final class Texts {
         return term("card.", card.name());
     }
 
-    /** A card name that is translated later, for a message whose reader is not known yet. */
+    /**
+     * A card name that is translated later, for a message whose reader is not known yet.
+     */
     public static Msg cardMsg(Card card) {
         return Msg.of("card." + keyOf(card.name()));
     }
@@ -122,14 +126,16 @@ public final class Texts {
         return get("role." + role.name().toLowerCase(Locale.ROOT) + ".description");
     }
 
-    /** Rank title earned by the number of won cases. */
+    /**
+     * Rank title earned by the number of won cases.
+     */
     public String rank(int wins) {
         String rank = wins >= 30 ? "superintendent"
                 : wins >= 15 ? "chief_inspector"
-                : wins >= 8 ? "inspector"
-                : wins >= 3 ? "detective"
-                : wins >= 1 ? "constable"
-                : "recruit";
+                  : wins >= 8 ? "inspector"
+                    : wins >= 3 ? "detective"
+                      : wins >= 1 ? "constable"
+                        : "recruit";
         return get("rank." + rank);
     }
 
@@ -150,7 +156,9 @@ public final class Texts {
 
     // ---------------------------------------------------------------- Text from users
 
-    /** Makes any text safe for Telegram's HTML mode. */
+    /**
+     * Makes any text safe for Telegram's HTML mode.
+     */
     public static String esc(String text) {
         if (text == null) {
             return "";
@@ -166,12 +174,16 @@ public final class Texts {
         return dyn(shorten(raw, maxLength));
     }
 
-    /** Like {@link #name} without shortening. */
+    /**
+     * Like {@link #name} without shortening.
+     */
     public String dyn(String raw) {
         return isolate(raw, esc(raw));
     }
 
-    /** A user's name for a button or a pop-up, where HTML is not allowed. */
+    /**
+     * A user's name for a button or a pop-up, where HTML is not allowed.
+     */
     public String plainName(String raw, int maxLength) {
         String shortened = shorten(raw, maxLength);
         return isolate(shortened, shortened);
@@ -183,7 +195,9 @@ public final class Texts {
                 : prepared;
     }
 
-    /** True if the text contains letters of the opposite direction, for example Latin in Persian. */
+    /**
+     * True if the text contains letters of the opposite direction, for example Latin in Persian.
+     */
     private boolean runsAgainstLanguage(String text) {
         if (text == null) {
             return false;
@@ -197,7 +211,9 @@ public final class Texts {
         });
     }
 
-    /** Cuts long names so one long title cannot break a screen. */
+    /**
+     * Cuts long names so one long title cannot break a screen.
+     */
     public String shorten(String text, int maxLength) {
         if (text == null || text.isBlank()) {
             return get("common.unknown");

@@ -17,12 +17,7 @@ import java.util.function.IntFunction;
 
 import static de.winona.telegrambot.ui.Keyboard.button;
 import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.Theme.bold;
-import static de.winona.telegrambot.ui.Theme.code;
-import static de.winona.telegrambot.ui.Theme.esc;
-import static de.winona.telegrambot.ui.Theme.heading;
-import static de.winona.telegrambot.ui.Theme.italic;
-import static de.winona.telegrambot.ui.Theme.note;
+import static de.winona.telegrambot.ui.Theme.*;
 
 /**
  * The screens of the private dashboard. Every method only turns data into a {@link Screen};
@@ -73,7 +68,7 @@ public final class MenuScreens {
         String line = first.inProgress()
                 ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), Game.MAX_ROUNDS)
                 : Theme.ICON_WAITING + " " + t.get("home.status.room", first.code(),
-                        first.players().size(), Lobby.MAX_PLAYERS);
+                first.players().size(), Lobby.MAX_PLAYERS);
         if (rooms.size() > 1) {
             line += "\n" + t.plural("home.status.more", rooms.size() - 1);
         }
@@ -82,7 +77,9 @@ public final class MenuScreens {
 
     // ---------------------------------------------------------------- Language
 
-    /** The button is written in every language, so it can be found without reading the current one. */
+    /**
+     * The button is written in every language, so it can be found without reading the current one.
+     */
     private static InlineKeyboardButton languageButton() {
         StringBuilder label = new StringBuilder(Theme.ICON_LANGUAGE);
         for (Language language : Language.values()) {
@@ -196,7 +193,9 @@ public final class MenuScreens {
         return t.banner(Banner.ROOMS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    /** Numbered list of the players in a room, with the host marked. */
+    /**
+     * Numbered list of the players in a room, with the host marked.
+     */
     public static String playerList(Texts t, List<Player> players, RoomSummary room) {
         if (players.isEmpty()) {
             return italic(t.get("room.nobody")) + "\n";
@@ -238,7 +237,9 @@ public final class MenuScreens {
         return t.banner(Banner.ROOMS, text, keyboard.build());
     }
 
-    /** Shown when a room code cannot be joined. The reason is a full sentence. */
+    /**
+     * Shown when a room code cannot be joined. The reason is a full sentence.
+     */
     public static Screen joinFailed(Texts t, String code, Msg reason) {
         String text = heading(Theme.ICON_JOIN, t.get("join.title"), t.get("join.failed.sub", code)) + "\n\n"
                 + Theme.ICON_WRONG + " " + esc(t.get(reason));
@@ -414,7 +415,9 @@ public final class MenuScreens {
 
     // ---------------------------------------------------------------- Shared parts
 
-    /** Adds the navigation row that every dashboard screen ends with. */
+    /**
+     * Adds the navigation row that every dashboard screen ends with.
+     */
     public static Keyboard withNavigation(Texts t, Keyboard keyboard) {
         List<InlineKeyboardButton> buttons = new ArrayList<>(List.of(
                 button(Theme.ICON_HOME + " " + t.get("nav.home"), Callbacks.HOME),
@@ -443,7 +446,9 @@ public final class MenuScreens {
         return inReadingOrder(t, buttons);
     }
 
-    /** Telegram always lays buttons out from left to right. This puts the first button where reading starts. */
+    /**
+     * Telegram always lays buttons out from left to right. This puts the first button where reading starts.
+     */
     private static InlineKeyboardButton[] inReadingOrder(Texts t, List<InlineKeyboardButton> buttons) {
         if (t.isRightToLeft()) {
             Collections.reverse(buttons);

@@ -13,14 +13,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Keeps the results of closed cases per player and stores them in a small properties file,
@@ -66,12 +59,16 @@ public class StatsService {
         return Optional.ofNullable(statsByUser.get(userId));
     }
 
-    /** Players ordered by wins, then by win rate, then by fewer games. */
+    /**
+     * Players ordered by wins, then by win rate, then by fewer games.
+     */
     public List<PlayerStats> leaderboard(int limit) {
         return ranking().stream().limit(limit).toList();
     }
 
-    /** Position on the leaderboard, starting at 1. Empty if the player has no closed case. */
+    /**
+     * Position on the leaderboard, starting at 1. Empty if the player has no closed case.
+     */
     public Optional<Integer> rankOf(long userId) {
         List<PlayerStats> ranking = ranking();
         for (int i = 0; i < ranking.size(); i++) {

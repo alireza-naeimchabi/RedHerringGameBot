@@ -41,7 +41,9 @@ public final class Theme {
     private Theme() {
     }
 
-    /** Makes any text safe for Telegram's HTML mode. Use it for names and titles from users. */
+    /**
+     * Makes any text safe for Telegram's HTML mode. Use it for names and titles from users.
+     */
     public static String esc(String text) {
         if (text == null) {
             return "";
@@ -57,7 +59,9 @@ public final class Theme {
         return "<i>" + esc(text) + "</i>";
     }
 
-    /** Crossed-out text, used for cards the lab has cleared. */
+    /**
+     * Crossed-out text, used for cards the lab has cleared.
+     */
     public static String struck(String text) {
         return "<s>" + esc(text) + "</s>";
     }
@@ -66,23 +70,31 @@ public final class Theme {
         return "<code>" + esc(text) + "</code>";
     }
 
-    /** A highlighted block. The content must already be valid HTML. */
+    /**
+     * A highlighted block. The content must already be valid HTML.
+     */
     public static String note(String html) {
         return "<blockquote>" + html + "</blockquote>";
     }
 
-    /** Screen heading: a bold title and an optional quiet line below it. */
+    /**
+     * Screen heading: a bold title and an optional quiet line below it.
+     */
     public static String heading(String icon, String title, String subline) {
         String heading = icon + " " + bold(title);
         return subline == null ? heading : heading + "\n" + italic(subline);
     }
 
-    /** Seats as dots, for example ●●●○○○○. */
+    /**
+     * Seats as dots, for example ●●●○○○○.
+     */
     public static String seats(int taken, int capacity) {
         return SEAT_TAKEN.repeat(Math.max(0, taken)) + SEAT_FREE.repeat(Math.max(0, capacity - taken));
     }
 
-    /** One circled initial per name, for example Ⓐ Ⓢ Ⓑ. */
+    /**
+     * One circled initial per name, for example Ⓐ Ⓢ Ⓑ.
+     */
     public static String initials(List<String> names) {
         return names.stream().map(Theme::initial).collect(Collectors.joining(" "));
     }

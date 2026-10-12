@@ -11,15 +11,15 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class LobbyServiceTest {
 
     private static final Player HOST = new Player(1, "Host");
 
-    /** A clock the test can move forward. */
+    /**
+     * A clock the test can move forward.
+     */
     private static final class MovableClock extends Clock {
         private Instant now = Instant.parse("2026-10-10T10:00:00Z");
 

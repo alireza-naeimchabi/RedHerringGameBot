@@ -1,14 +1,6 @@
 package de.winona.telegrambot.model;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * The rules of one case.
@@ -18,15 +10,18 @@ import java.util.Set;
  * each suspect may send one card to the <b>forensic lab</b>. The lab finds a trace on the real
  * cards and on the planted ones alike, so only the scene tiles tell the two trails apart.
  */
-public class Game
-{
+public class Game {
 
     public static final int MAX_ROUNDS = 3;
-    /** Cause of death always stays on the board. */
+    /**
+     * Cause of death always stays on the board.
+     */
     public static final int FIXED_TILES = 1;
     public static final int LAB_TESTS_PER_ROUND = 1;
 
-    /** A typed answer of the Forensic Scientist may be at most this long. */
+    /**
+     * A typed answer of the Forensic Scientist may be at most this long.
+     */
     public static final int MAX_ANSWER_LENGTH = 60;
 
     private final Room room;
@@ -79,12 +74,10 @@ public class Game
         // The shuffled order decides the roles. The players are stored in their seat order,
         // otherwise the murderer would always be listed first among the suspects.
         Map<Player, Role> drawn = new HashMap<>();
-        for (int i = 0; i < shuffled.size(); i++)
-        {
+        for (int i = 0; i < shuffled.size(); i++) {
             drawn.put(shuffled.get(i), roleForIndex(i));
         }
-        for (Player player : players)
-        {
+        for (Player player : players) {
             roles.put(player, drawn.get(player));
         }
 
@@ -110,7 +103,9 @@ public class Game
         return room;
     }
 
-    /** A practice case uses test players or a forced role and does not count for statistics. */
+    /**
+     * A practice case uses test players or a forced role and does not count for statistics.
+     */
     public boolean isPractice() {
         return practice;
     }
@@ -139,7 +134,9 @@ public class Game
                 .orElseThrow();
     }
 
-    /** Everyone who has cards: the murderer and the investigators. */
+    /**
+     * Everyone who has cards: the murderer and the investigators.
+     */
     public List<Player> getSuspects() {
         return new ArrayList<>(hands.keySet());
     }
@@ -172,7 +169,9 @@ public class Game
         return murderWeapon != null;
     }
 
-    /** True once the murderer has chosen the Means of Murder and the Key Evidence. */
+    /**
+     * True once the murderer has chosen the Means of Murder and the Key Evidence.
+     */
     public boolean hasSolution() {
         return murderWeapon != null && keyEvidence != null;
     }
@@ -187,7 +186,9 @@ public class Game
 
     // ---------------------------------------------------------------- The red herring
 
-    /** The players the murderer can frame: every suspect except the murderer. */
+    /**
+     * The players the murderer can frame: every suspect except the murderer.
+     */
     public List<Player> getPossibleScapegoats() {
         List<Player> others = getSuspects();
         others.remove(getMurderer());
@@ -230,7 +231,9 @@ public class Game
         return plantedClue;
     }
 
-    /** True once the solution is chosen and the red herring is planted. Only then the case can move on. */
+    /**
+     * True once the solution is chosen and the red herring is planted. Only then the case can move on.
+     */
     public boolean isCrimeSealed() {
         return hasSolution() && scapegoat != null && plantedMeans != null && plantedClue != null;
     }
@@ -292,7 +295,9 @@ public class Game
         return offeredTiles;
     }
 
-    /** The tiles the Forensic Scientist may choose from. Empty once one is chosen. */
+    /**
+     * The tiles the Forensic Scientist may choose from. Empty once one is chosen.
+     */
     public List<HintTile> getOfferedTiles() {
         return offeredTiles;
     }
@@ -302,7 +307,9 @@ public class Game
         offeredTiles = List.of();
     }
 
-    /** True while the Forensic Scientist still has to choose, place or answer the new tile. */
+    /**
+     * True while the Forensic Scientist still has to choose, place or answer the new tile.
+     */
     public boolean isReplacementPending() {
         return !offeredTiles.isEmpty() || pendingTile != null;
     }
@@ -319,8 +326,7 @@ public class Game
         pendingSlot = slot;
     }
 
-    public void addReplacementHint(int optionIndex)
-    {
+    public void addReplacementHint(int optionIndex) {
         hintTiles.set(pendingSlot, pendingTile);
         hints.set(pendingSlot, new Hint(pendingTile.title(), pendingTile.options().get(optionIndex),
                 pendingTile.subject()));
@@ -330,20 +336,24 @@ public class Game
 
     // ---------------------------------------------------------------- Typed answers
 
-    /** True while the Forensic Scientist has a scene tile open that they answer by typing. */
-    public boolean isWaitingForTypedAnswer()
-    {
+    /**
+     * True while the Forensic Scientist has a scene tile open that they answer by typing.
+     */
+    public boolean isWaitingForTypedAnswer() {
         return isCrimeSealed() && (getCurrentHintTile().isPresent() || hasPendingSlot());
     }
 
-    /** The scene tile the Forensic Scientist answers right now. */
+    /**
+     * The scene tile the Forensic Scientist answers right now.
+     */
     public HintTile getOpenTile() {
         return hasPendingSlot() ? pendingTile : getCurrentHintTile().orElseThrow();
     }
 
-    /** Saves a typed answer: as the next answer in round 1, or in place of an old one in rounds 2 and 3. */
-    public void addTypedAnswer(String answer)
-    {
+    /**
+     * Saves a typed answer: as the next answer in round 1, or in place of an old one in rounds 2 and 3.
+     */
+    public void addTypedAnswer(String answer) {
         if (hasPendingSlot()) {
             hintTiles.set(pendingSlot, pendingTile);
             hints.set(pendingSlot, new Hint(pendingTile.title(), answer, pendingTile.subject(), true));
@@ -357,7 +367,9 @@ public class Game
 
     // ---------------------------------------------------------------- Forensic lab
 
-    /** The lab works on the cards once the scene report of the current round is complete. */
+    /**
+     * The lab works on the cards once the scene report of the current round is complete.
+     */
     public boolean isLabOpen() {
         return isCrimeSealed() && allHintsGiven() && !isReplacementPending();
     }
@@ -380,8 +392,7 @@ public class Game
      * Sends one card to the lab and uses the tester's test for this round.
      * The lab cannot tell a real trace from a planted one.
      */
-    public LabResult testCard(long testerId, Player owner, Card card)
-    {
+    public LabResult testCard(long testerId, Player owner, Card card) {
         Player tester = getPlayer(testerId).orElseThrow();
         testsInCurrentRound.merge(testerId, 1, Integer::sum);
         LabResult result = new LabResult(round, tester, owner, card, leavesTrace(card));
@@ -389,8 +400,7 @@ public class Game
         return result;
     }
 
-    private boolean leavesTrace(Card card)
-    {
+    private boolean leavesTrace(Card card) {
         return card.equals(murderWeapon) || card.equals(keyEvidence)
                 || card.equals(plantedMeans) || card.equals(plantedClue);
     }
@@ -399,12 +409,16 @@ public class Game
         return Collections.unmodifiableList(labResults);
     }
 
-    /** How many lab tests were used in the current round. */
+    /**
+     * How many lab tests were used in the current round.
+     */
     public int getTestsUsedThisRound() {
         return testsInCurrentRound.values().stream().mapToInt(Integer::intValue).sum();
     }
 
-    /** How many lab tests real players have per round. Test players never use the lab. */
+    /**
+     * How many lab tests real players have per round. Test players never use the lab.
+     */
     public int getTestsPerRound() {
         return (int) getSuspects().stream().filter(player -> player.userId() > 0).count() * LAB_TESTS_PER_ROUND;
     }

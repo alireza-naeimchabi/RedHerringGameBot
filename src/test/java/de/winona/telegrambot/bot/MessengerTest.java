@@ -12,11 +12,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-/** How screens in one or two languages reach a chat. */
+/**
+ * How screens in one or two languages reach a chat.
+ */
 class MessengerTest {
 
     private static final long CHAT = -500L;
