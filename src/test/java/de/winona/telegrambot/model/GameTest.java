@@ -90,21 +90,36 @@ class GameTest {
     }
 
     @Test
-    void everySuspectHasOneLabTestPerRoundAndTheForensicScientistHasNone() {
-        long tester = bystander.userId();
+    void suspectsTestOneCardEachInSeatOrderAndTheForensicScientistNever() {
+        List<Player> order = game.getTurnOrder();
+        assertEquals(game.getSuspects(), order, "turns follow the seat order");
         assertTrue(game.isLabOpen());
-        assertTrue(game.canTest(tester));
+        assertTrue(game.isTurnPhase());
+        assertFalse(game.isDiscussion());
+
+        Player first = order.get(0);
+        Player second = order.get(1);
+        assertTrue(game.canTest(first.userId()));
+        assertFalse(game.canTest(second.userId()), "only the player on turn may test");
         assertFalse(game.canTest(game.getForensicScientist().userId()));
         assertFalse(game.canTest(999), "strangers have no test");
 
-        LabResult result = game.testCard(tester, murderer, game.getMurdererHand().weapons().get(3));
+        // Index 3 is never a real or a planted card (those are 0 and 1, 2 and 3 only as clue).
+        LabResult result = game.testCard(first.userId(), second, game.getHands().get(second).weapons().get(3));
         assertFalse(result.trace());
         assertEquals(1, result.round());
-        assertFalse(game.canTest(tester), "one test per round");
-        assertTrue(game.canTest(murderer.userId()), "other suspects still have theirs");
+        game.endTurn();
+        assertFalse(game.canTest(first.userId()), "one test per round");
+        assertTrue(game.canTest(second.userId()), "now the next suspect is up");
         assertEquals(1, game.getTestsUsedThisRound());
         assertEquals(4, game.getTestsPerRound());
         assertTrue(game.findLabResult(result.card()).isPresent());
+
+        for (int i = 1; i < order.size(); i++) {
+            game.endTurn();
+        }
+        assertTrue(game.isDiscussion(), "every suspect had a turn");
+        assertTrue(game.getCurrentTurn().isEmpty());
 
         List<HintTile> offered = game.startNextRound();
         assertFalse(game.isLabOpen(), "the lab waits for the new scene report");
@@ -118,7 +133,8 @@ class GameTest {
         game.addReplacementHint(0);
 
         assertTrue(game.isLabOpen());
-        assertTrue(game.canTest(tester), "a new round brings a new test");
+        assertTrue(game.isTurnOf(first.userId()), "a new round starts again with the first seat");
+        assertTrue(game.canTest(first.userId()), "a new round brings a new test");
         assertEquals(0, game.getTestsUsedThisRound());
         assertEquals("Cause of death", game.getHints().get(0).title());
         assertEquals(offered.get(1).title(), game.getHints().get(Game.FIXED_TILES).title());
@@ -161,6 +177,8 @@ class GameTest {
         Hand real = game.getMurdererHand();
         Hand framed = game.getScapegoatHand();
 
+        assertFalse(game.canAccuse(murderer.userId()), "nobody accuses before every suspect had a turn");
+        game.getTurnOrder().forEach(player -> game.endTurn());
         assertTrue(game.canAccuse(murderer.userId()), "the button gives nothing away");
         assertEquals(AccusationResult.WRONG,
                 game.accuse(murderer.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3)),

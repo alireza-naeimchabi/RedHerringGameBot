@@ -44,6 +44,7 @@ public final class Callbacks {
     public static final String LAB_SUSPECT = "LP";
     public static final String LAB_CARD = "LC";
     public static final String LAB_CANCEL = "LX";
+    public static final String SKIP_TURN = "ST";
 
     private Callbacks() {
     }

@@ -290,7 +290,7 @@ class RedHerringBotTest {
             tile = telegram.find(scientist.getId(), "SCENE TILE " + i + " OF 6").orElseThrow();
             assertTrue(tile.html.contains(i <= 3 ? "describes the Means of Murder" : "describes the Key Evidence"));
             say(scientist, "Typed answer " + i);
-            assertTrue(telegram.last(GROUP).html.contains("Typed answer " + i), "the group sees the answer");
+            assertTrue(telegram.find(GROUP, "Typed answer " + i).isPresent(), "the group sees the answer");
         }
         tile = telegram.find(scientist.getId(), "ROUND 1 REPORT IS OUT").orElseThrow();
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
@@ -298,20 +298,38 @@ class RedHerringBotTest {
         assertEquals(3, countOccurrences(report.html, "🔍 "));
         String wrongClue = otherClueOf(murderer, crime.keyEvidence);
 
-        // The lab: one test per suspect and round, results for everyone.
+        // The lab: the suspects take turns in seat order, and whoever is not on turn has to wait.
         press(scientist, report, report.button("Lab Test").orElseThrow().getCallbackData());
         assertTrue(telegram.lastAnswer().text().contains("Forensic Scientist does not use the lab"));
 
-        Shown lab = labTest(first, report, murderer.getFirstName(), crime.means, second);
-        assertTrue(lab.html.contains("TRACE FOUND"));
-        assertTrue(lab.html.contains("Lab tests used this round: 1 of 3"));
-        assertTrue(lab.buttons().isEmpty());
-        press(first, report, report.button("Lab Test").orElseThrow().getCallbackData());
-        assertTrue(telegram.lastAnswer().text().contains("used your lab test for this round"));
-
-        assertTrue(labTest(second, report, crime.scapegoat, crime.plantedClue, null).html.contains("TRACE FOUND"),
+        Map<User, String[]> planned = Map.of(
+                first, new String[]{murderer.getFirstName(), crime.means},
+                second, new String[]{crime.scapegoat, crime.plantedClue},
+                murderer, new String[]{murderer.getFirstName(), wrongClue});
+        Map<User, Shown> results = new HashMap<>();
+        for (int turn = 1; turn <= 3; turn++) {
+            User tester = currentTurn();
+            User waiting = planned.keySet().stream()
+                    .filter(user -> user != tester && !results.containsKey(user))
+                    .findFirst().orElse(null);
+            if (waiting != null) {
+                press(waiting, report, report.button("Lab Test").orElseThrow().getCallbackData());
+                assertTrue(telegram.lastAnswer().text().contains("turn of " + tester.getFirstName()),
+                        telegram.lastAnswer().text());
+            }
+            String[] card = planned.get(tester);
+            Shown lab = labTest(tester, report, card[0], card[1], waiting);
+            assertTrue(lab.html.contains("Lab tests used this round: " + turn + " of 3"), lab.html);
+            assertTrue(lab.buttons().isEmpty());
+            press(tester, report, report.button("Lab Test").orElseThrow().getCallbackData());
+            assertTrue(telegram.lastAnswer().text().contains("used your lab test for this round"));
+            results.put(tester, lab);
+        }
+        assertTrue(results.get(first).html.contains("TRACE FOUND"));
+        assertTrue(results.get(second).html.contains("TRACE FOUND"),
                 "the lab cannot tell a planted card from a real one");
-        assertTrue(labTest(murderer, report, murderer.getFirstName(), wrongClue, null).html.contains("CLEAN"));
+        assertTrue(results.get(murderer).html.contains("CLEAN"));
+        assertTrue(telegram.last(GROUP).html.contains("ROUND 1 OF 3 IS OVER"));
 
         press(first, report, report.button("Evidence Board").orElseThrow().getCallbackData());
         Shown board = telegram.last(GROUP);
@@ -347,21 +365,24 @@ class RedHerringBotTest {
         assertTrue(tile.html.contains("NEW SCENE TILE"));
         assertTrue(tile.buttons().isEmpty(), "the new answer is typed as well");
         say(scientist, "A new typed answer");
-        Shown secondReport = telegram.last(GROUP);
+        Shown secondReport = lastWith("SCENE REPORT");
         assertTrue(secondReport.html.contains("round 2 of 3"));
         assertTrue(secondReport.html.contains("Lab results"));
         assertEquals(2, countOccurrences(secondReport.html, "🩸"));
 
-        // A new round brings a new lab test.
-        assertTrue(labTest(first, secondReport, murderer.getFirstName(), crime.keyEvidence, null)
-                .html.contains("TRACE FOUND"));
-        press(second, secondReport, secondReport.button("Lab Test").orElseThrow().getCallbackData());
+        // A new round brings a new turn for everyone, again in seat order.
+        User onTurn = currentTurn();
+        press(onTurn, secondReport, secondReport.button("Lab Test").orElseThrow().getCallbackData());
         Shown repeat = telegram.last(GROUP);
-        press(second, repeat, repeat.button(murderer.getFirstName()).orElseThrow().getCallbackData());
-        press(second, repeat, repeat.button(crime.means).orElseThrow().getCallbackData());
+        press(onTurn, repeat, repeat.button(murderer.getFirstName()).orElseThrow().getCallbackData());
+        press(onTurn, repeat, repeat.button(crime.means).orElseThrow().getCallbackData());
         assertTrue(telegram.lastAnswer().text().contains("already tested " + crime.means));
-        press(second, repeat, repeat.button("Cancel").orElseThrow().getCallbackData());
+        press(onTurn, repeat, repeat.button("Cancel").orElseThrow().getCallbackData());
         assertTrue(repeat.html.contains("kept the lab test"));
+        assertEquals(onTurn, currentTurn(), "cancelling keeps the turn");
+        assertTrue(labTest(onTurn, secondReport, murderer.getFirstName(), crime.keyEvidence, null)
+                .html.contains("TRACE FOUND"));
+        skipAllTurns();
 
         // The case file in the private chat ("Rejoin Game").
         say(first, "/rooms");
@@ -422,6 +443,7 @@ class RedHerringBotTest {
         Crime crime = commitCrime(murderer, 0, 0);
         answerAllTiles(scientist);
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
+        skipAllTurns();
 
         User accuser = table.stream()
                 .filter(user -> user != scientist && user != murderer
@@ -447,6 +469,7 @@ class RedHerringBotTest {
         Crime crime = commitCrime(murderer, 0, 0);
         answerAllTiles(scientist);
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
+        skipAllTurns();
 
         // The murderer knows where the red herring is, but naming it does not end the case.
         accuse(murderer, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
@@ -470,12 +493,14 @@ class RedHerringBotTest {
         commitCrime(murderer, 0, 0);
 
         Shown tile = answerAllTiles(scientist);
+        skipAllTurns();
         for (int round = 2; round <= 3; round++) {
             press(scientist, tile, tile.button("Next Round").orElseThrow().getCallbackData());
             press(scientist, tile, tile.buttons().get(0).getCallbackData()); // new tile
             press(scientist, tile, tile.buttons().get(1).getCallbackData()); // answer to replace
             say(scientist, "Answer in round " + round); // the new answer is typed
             tile = telegram.last(scientist.getId());
+            skipAllTurns();
         }
         assertTrue(tile.html.contains("final round"));
         press(scientist, tile, tile.button("Close the Case").orElseThrow().getCallbackData());
@@ -507,7 +532,8 @@ class RedHerringBotTest {
         assertTrue(lab.html.contains("Lab tests used this round: 1 of 1"), "test players do not use the lab");
 
         group(alireza, "/nextround");
-        assertTrue(telegram.last(GROUP).html.contains("round 2 of 3"));
+        assertTrue(telegram.find(GROUP, "round 2 of 3").isPresent());
+        skipAllTurns();
 
         press(alireza, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
         Shown flow = telegram.last(GROUP);
@@ -584,6 +610,60 @@ class RedHerringBotTest {
 
     private Shown roomCard() {
         return telegram.find(GROUP, "Room code").orElseThrow();
+    }
+
+    /**
+     * The newest group message that contains the text.
+     */
+    private Shown lastWith(String text) {
+        List<Shown> shown = telegram.chat(GROUP);
+        for (int i = shown.size() - 1; i >= 0; i--) {
+            if (shown.get(i).html.contains(text)) {
+                return shown.get(i);
+            }
+        }
+        throw new AssertionError("no group message with " + text);
+    }
+
+    /**
+     * The newest group message with a Skip Turn button, if there is one.
+     */
+    private Optional<Shown> newestTurnMessage() {
+        List<Shown> shown = telegram.chat(GROUP);
+        for (int i = shown.size() - 1; i >= 0; i--) {
+            if (shown.get(i).buttons().stream()
+                    .anyMatch(button -> String.valueOf(button.getCallbackData()).startsWith("ST:"))) {
+                return Optional.of(shown.get(i));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Shown turnMessage() {
+        return newestTurnMessage().orElseThrow(() -> new AssertionError("no turn announcement in the group"));
+    }
+
+    private User currentTurn() {
+        Shown turn = turnMessage();
+        return table.stream().filter(user -> turn.html.contains(user.getFirstName())).findFirst().orElseThrow();
+    }
+
+    /**
+     * The host skips every remaining turn, so the round reaches the point where the crime can be solved.
+     */
+    private void skipAllTurns() {
+        while (true) {
+            Optional<Shown> turn = newestTurnMessage();
+            if (turn.isEmpty()) {
+                return;
+            }
+            String skip = turn.get().buttons().stream().map(InlineKeyboardButton::getCallbackData)
+                    .filter(data -> data != null && data.startsWith("ST:")).findFirst().orElseThrow();
+            press(alireza, turn.get(), skip);
+            if (telegram.lastAnswer().alert()) {
+                return; // an old announcement: no turn is open any more
+            }
+        }
     }
 
     private String openCaseWithFourPlayers() {

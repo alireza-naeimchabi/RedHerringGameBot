@@ -53,6 +53,8 @@ public class Game {
     private final List<LabResult> labResults = new ArrayList<>();
     private final Map<Long, Integer> testsInCurrentRound = new HashMap<>();
     private final Set<Long> usedAccusations = new HashSet<>();
+    // Turns: after the scene report every real suspect takes one turn, in seat order
+    private int turnIndex = 0;
 
     public Game(Room room, List<Player> players, Player forcedPlayer, Role forcedRole) {
         this.room = room;
@@ -285,6 +287,7 @@ public class Game {
     public List<HintTile> startNextRound() {
         round++;
         testsInCurrentRound.clear();
+        turnIndex = 0;
         List<HintTile> offer = new ArrayList<>(hintDeck.drawOffer());
         if (hints.stream().noneMatch(hint -> hint.subject() == TileSubject.MURDERER)) {
             offer.add(HintDeck.MURDERER_PROFILE);
@@ -381,7 +384,8 @@ public class Game {
     public boolean canTest(long userId) {
         return getRole(userId).filter(role -> role != Role.FORENSIC_SCIENTIST).isPresent()
                 && isLabOpen()
-                && hasTestLeft(userId);
+                && hasTestLeft(userId)
+                && isTurnOf(userId);
     }
 
     public Optional<LabResult> findLabResult(Card card) {
@@ -423,6 +427,47 @@ public class Game {
         return (int) getSuspects().stream().filter(player -> player.userId() > 0).count() * LAB_TESTS_PER_ROUND;
     }
 
+    // ---------------------------------------------------------------- Turns
+
+    /**
+     * The suspects who take turns, in seat order. Test players never take a turn.
+     */
+    public List<Player> getTurnOrder() {
+        return getSuspects().stream().filter(player -> player.userId() > 0).toList();
+    }
+
+    public int getTurnIndex() {
+        return turnIndex;
+    }
+
+    /**
+     * True while the suspects are taking their turns: the report is out and not everyone has had a turn.
+     */
+    public boolean isTurnPhase() {
+        return isLabOpen() && turnIndex < getTurnOrder().size();
+    }
+
+    /**
+     * True once every suspect has had a turn: now the crime can be solved or the next round started.
+     */
+    public boolean isDiscussion() {
+        return isLabOpen() && turnIndex >= getTurnOrder().size();
+    }
+
+    public Optional<Player> getCurrentTurn() {
+        return isTurnPhase() ? Optional.of(getTurnOrder().get(turnIndex)) : Optional.empty();
+    }
+
+    public boolean isTurnOf(long userId) {
+        return getCurrentTurn().filter(player -> player.userId() == userId).isPresent();
+    }
+
+    /**
+     * The current player has tested a card or skipped: the next one is up.
+     */
+    public void endTurn() {
+        turnIndex++;
+    }
     // ---------------------------------------------------------------- Accusations
 
     public boolean hasAccused(long userId) {
@@ -434,7 +479,8 @@ public class Game {
         return player.isPresent()
                 && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
                 && isCrimeSealed()
-                && !usedAccusations.contains(userId);
+                && !usedAccusations.contains(userId)
+                && isDiscussion();
     }
 
     /**
