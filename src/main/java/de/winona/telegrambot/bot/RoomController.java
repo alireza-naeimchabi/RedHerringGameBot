@@ -131,6 +131,8 @@ public class RoomController {
         if (lobby.isFull()) {
             return JoinOutcome.FULL;
         }
+        // Everyone in a room plays in the host's language, so group messages stay in one language.
+        localizer.setLanguage(user.getId(), localizer.languageOf(lobby.getRoom().host().userId()));
         if (confirmInPrivate && messenger.send(user.getId(), seatConfirmation(user.getId(), lobby)).isEmpty()) {
             return JoinOutcome.NEEDS_PRIVATE_CHAT;
         }
@@ -343,7 +345,8 @@ public class RoomController {
         JoinOutcome outcome = join(code, click.user(), !click.inPrivateChat());
         switch (outcome) {
             case JOINED -> {
-                click.toast(outcome.message(code));
+                // The player now reads the room's language, so the pop-up uses it too.
+                click.toastText(localizer.textsFor(click.userId()).get(outcome.message(code)));
                 refreshPrivateRoomScreen(click, code);
             }
             case ALREADY_SEATED -> click.toast(outcome.message(code));
@@ -375,7 +378,7 @@ public class RoomController {
             return;
         }
         lobbyService.findByCode(code).ifPresent(lobby -> messenger.show(click.message(),
-                MenuScreens.roomDetails(click.texts(), RoomSummary.of(lobby), click.userId())));
+                MenuScreens.roomDetails(localizer.textsFor(click.userId()), RoomSummary.of(lobby), click.userId())));
     }
 
     // ---------------------------------------------------------------- Who sees what, in which language
