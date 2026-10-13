@@ -295,15 +295,17 @@ class BilingualBotTest {
         User first = cast.investigators.get(0);
         User second = cast.investigators.get(1);
 
-        // A lab test, with its pop-up for a second try.
-        press(first, cast.report, "LT:" + GROUP);
+        // A lab test on the player's own turn, with its pop-up for a second try.
+        User tester = currentTurn();
+        press(tester, cast.report, "LT:" + GROUP);
         Shown lab = telegram.last(GROUP);
         assertTrue(lab.html.contains(FA.get("lab.who.ask")));
-        press(first, lab, lab.buttons().get(0).getCallbackData());
-        press(first, lab, lab.buttons().get(0).getCallbackData());
+        press(tester, lab, lab.buttons().get(0).getCallbackData());
+        press(tester, lab, lab.buttons().get(0).getCallbackData());
         assertTrue(lab.html.contains(FA.get("lab.result.title")), lab.html);
-        press(first, cast.report, "LT:" + GROUP);
+        press(tester, cast.report, "LT:" + GROUP);
         assertEquals(FA.get("err.lab.used"), telegram.lastAnswer().text());
+        skipAllTurns();
 
         // A wrong accusation: the right player and means, the wrong clue card.
         press(second, cast.report, "AC:" + GROUP);
@@ -327,8 +329,8 @@ class BilingualBotTest {
         press(cast.scientist, tile, tile.buttons().get(0).getCallbackData());
         say(cast.scientist, FA.option("Wiped away"));
         assertTrue(tile.html.contains(FA.get("newtile.title")), tile.html);
-        assertTrue(telegram.last(GROUP).html.contains(FA.get("report.sub", code, 2, 3)), telegram.last(GROUP).html);
-        assertTrue(telegram.last(GROUP).html.contains(FA.get("report.lab")));
+        assertTrue(telegram.find(GROUP, FA.get("report.sub", code, 2, 3)).isPresent());
+        assertTrue(telegram.find(GROUP, FA.get("report.lab")).isPresent());
 
         // The case file and the room list in the private chat.
         say(second, "/rooms");
@@ -336,6 +338,7 @@ class BilingualBotTest {
         press(second, rooms, "m:case:" + code);
         assertTrue(telegram.last(second.getId()).html.contains(FA.get("file.attempt.used")));
 
+        skipAllTurns();
         accuseCorrectly(first, cast);
 
         Shown verdict = telegram.find(GROUP, FA.get("verdict.solved.title", code)).orElseThrow();
@@ -382,6 +385,7 @@ class BilingualBotTest {
         assertTrue(board.html.contains(EN.get("board.title")) && board.html.contains(FA.get("board.title")));
         assertTrue(board.html.contains(DIVIDER));
 
+        skipAllTurns();
         accuseCorrectly(cast.investigators.get(0), cast);
         assertTrue(telegram.last(GROUP).html.contains(FA.get("verdict.solved.title", code)));
     }
@@ -407,6 +411,46 @@ class BilingualBotTest {
     }
 
     // ---------------------------------------------------------------- Helpers
+
+    /**
+     * The newest group message with a Skip Turn button, if there is one.
+     */
+    private Optional<Shown> newestTurnMessage() {
+        List<Shown> shown = telegram.chat(GROUP);
+        for (int i = shown.size() - 1; i >= 0; i--) {
+            if (shown.get(i).buttons().stream()
+                    .anyMatch(button -> String.valueOf(button.getCallbackData()).startsWith("ST:"))) {
+                return Optional.of(shown.get(i));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Shown turnMessage() {
+        return newestTurnMessage().orElseThrow(() -> new AssertionError("no turn announcement in the group"));
+    }
+    private User currentTurn() {
+        Shown turn = turnMessage();
+        return table.stream().filter(user -> turn.html.contains(user.getFirstName())).findFirst().orElseThrow();
+    }
+
+    /**
+     * The host skips every remaining turn, so the round reaches the point where the crime can be solved.
+     */
+    private void skipAllTurns() {
+        while (true) {
+            Optional<Shown> turn = newestTurnMessage();
+            if (turn.isEmpty()) {
+                return;
+            }
+            String skip = turn.get().buttons().stream().map(InlineKeyboardButton::getCallbackData)
+                    .filter(data -> data != null && data.startsWith("ST:")).findFirst().orElseThrow();
+            press(alireza, turn.get(), skip);
+            if (telegram.lastAnswer().alert()) {
+                return; // an old announcement: no turn is open any more
+            }
+        }
+    }
 
     private Texts t(User user) {
         return languages.languageOf(user.getId()) == Language.PERSIAN ? FA : EN;
@@ -556,8 +600,9 @@ class BilingualBotTest {
 
         Shown report = telegram.chat(GROUP).stream()
                 .filter(shown -> shown.buttons().stream()
-                        .anyMatch(button ->
-                                ("LT:" + GROUP).equals(button.getCallbackData())))
+                        .anyMatch(button -> ("LT:" + GROUP).equals(button.getCallbackData()))
+                        && shown.buttons().stream()
+                        .anyMatch(button -> ("AC:" + GROUP).equals(button.getCallbackData())))
                 .reduce((first, second) -> second)
                 .orElseThrow(() ->
                         new AssertionError("no scene report in the group"));
