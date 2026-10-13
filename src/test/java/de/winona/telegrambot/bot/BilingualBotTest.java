@@ -466,6 +466,9 @@ class BilingualBotTest {
 
     private String createRoom() {
         group(alireza, "/newgame");
+        // The host first picks the room language: the one they already use.
+        String language = languages.languageOf(alireza.getId()).code();
+        press(alireza, telegram.last(GROUP), "r:lang:" + language + ":" + alireza.getId());
         Matcher matcher = Pattern.compile("r:join:([A-Z0-9]{4})").matcher(
                 roomCard().buttons().stream().map(InlineKeyboardButton::getCallbackData)
                         .filter(data -> data != null).reduce("", (a, b) -> a + " " + b));
