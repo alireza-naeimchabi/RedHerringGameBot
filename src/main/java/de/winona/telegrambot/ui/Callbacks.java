@@ -94,6 +94,11 @@ public final class Callbacks {
         return "r:new";
     }
 
+    /** The host picks the language of a new room. The host's id makes sure nobody else can. */
+    public static String roomLanguage(String languageCode, long hostId) {
+        return "r:lang:" + languageCode + ":" + hostId;
+    }
+
     public static String game(String action, long groupChatId, Object... arguments) {
         StringBuilder data = new StringBuilder(action).append(SEPARATOR).append(groupChatId);
         for (Object argument : arguments) {

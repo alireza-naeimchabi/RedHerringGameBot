@@ -119,7 +119,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
         long chatId = message.getChatId();
 
         switch (command) {
-            case "/start", "/newgame" -> roomController.createRoom(chatId, message.getChat().getTitle(), user);
+            case "/start", "/newgame" -> roomController.askRoomLanguage(chatId, user);
             case "/room" -> roomController.showRoomCard(chatId, user);
             case "/join" -> roomController.joinByCommand(chatId, user);
             case "/leave" -> roomController.leaveByCommand(chatId, user);

@@ -1,5 +1,6 @@
 package de.winona.telegrambot.ui;
 
+import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
@@ -769,5 +770,18 @@ public final class GameScreens {
      */
     private static String name(Texts t, Player player) {
         return t.plainName(player.name(), NAME_LENGTH);
+    }
+
+    /**
+     * Asked in the group before a room opens: the host picks the language of the whole room.
+     */
+    public static Screen roomLanguage(Texts t, long hostId) {
+        String text = Theme.heading(Theme.ICON_LANGUAGE, t.get("roomlang.title"), t.get("roomlang.sub"));
+        List<InlineKeyboardButton> choices = new ArrayList<>();
+        for (Language language : Language.values()) {
+            choices.add(Keyboard.button(language.flag() + " " + language.nativeName(),
+                    Callbacks.roomLanguage(language.code(), hostId)));
+        }
+        return t.banner(Banner.ROOMS, text, Keyboard.create().grid(choices, 3).build());
     }
 }
