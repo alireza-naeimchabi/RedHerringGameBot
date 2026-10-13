@@ -254,46 +254,34 @@ class BilingualBotTest {
     // ---------------------------------------------------------------- Rooms and languages
 
     @Test
-    void aGroupMessageIsWrittenInTheLanguagesOfItsPlayers() {
+    void aPlayerWhoJoinsReadsTheLanguageOfTheRoom() {
         String code = createRoom();
-        assertFalse(roomCard().html.contains(DIVIDER), "one language, one text");
-        assertFalse(PERSIAN_LETTER.matcher(roomCard().html).find());
-
-        // A Persian player takes a seat: the card now speaks both languages.
         languages.setLanguage(sara.getId(), Language.PERSIAN);
         press(sara, roomCard(), "r:join:" + code);
-        assertEquals(FA.get("toast.seated", code), telegram.lastAnswer().text(), "the pop-up is hers alone");
-        Shown card = roomCard();
-        assertTrue(card.html.contains(DIVIDER));
-        assertTrue(card.html.contains(EN.get("room.seats", 2, 7)));
-        assertTrue(card.html.contains(FA.get("room.seats", 2, 7)));
-        assertEquals(1, countOccurrences(card.html, DIVIDER));
-        String join = buttonFor(card, "r:join:" + code).getText();
-        assertTrue(join.contains(EN.get("btn.join_room")) && join.contains(FA.get("btn.join_room")), join);
-        assertTrue(telegram.find(sara.getId(), FA.get("seat.title", code)).isPresent(),
-                "her private confirmation is Persian only");
-        assertFalse(telegram.last(sara.getId()).html.contains(DIVIDER));
 
-        // She leaves again: the card is English only.
-        press(sara, roomCard(), "r:leave:" + code);
-        assertEquals(FA.get("room.left", code), telegram.lastAnswer().text());
-        assertFalse(roomCard().html.contains(DIVIDER));
-        assertFalse(PERSIAN_LETTER.matcher(roomCard().html).find());
+        // Sara chose Persian, but the room is English: she now plays in English.
+        assertEquals(Language.ENGLISH, languages.languageOf(sara.getId()));
+        assertEquals(EN.get("toast.seated", code), telegram.lastAnswer().text());
+        Shown card = roomCard();
+        assertFalse(card.html.contains(DIVIDER), "the room keeps one language");
+        assertFalse(PERSIAN_LETTER.matcher(card.html).find());
+        assertTrue(card.html.contains(EN.get("room.seats", 2, 7)));
+        assertTrue(telegram.find(sara.getId(), EN.get("seat.title", code)).isPresent(),
+                "her private confirmation is in the room language");
     }
 
     @Test
     void popUpsFollowThePersonWhoPressedNotTheRoom() {
         String code = createRoom();
-        languages.setLanguage(sara.getId(), Language.PERSIAN);
-        press(sara, roomCard(), "r:join:" + code);
 
-        press(sara, roomCard(), "r:start:" + code);
+        // Dana reads Persian and is not seated, so her pop-up stays Persian.
+        languages.setLanguage(dana.getId(), Language.PERSIAN);
+        press(dana, roomCard(), "r:start:" + code);
         assertTrue(PERSIAN_LETTER.matcher(telegram.lastAnswer().text()).find(), telegram.lastAnswer().text());
         press(alireza, roomCard(), "r:start:" + code);
-        assertEquals(EN.plural("err.need_players", 2, 4), telegram.lastAnswer().text());
+        assertEquals(EN.plural("err.need_players", 3, 4), telegram.lastAnswer().text());
 
         // Someone who is not in the room and reads Persian gets a Persian notice in the group.
-        languages.setLanguage(dana.getId(), Language.PERSIAN);
         group(dana, "/accuse");
         assertTrue(telegram.last(GROUP).html.contains(FA.get("err.no_case")));
         assertFalse(telegram.last(GROUP).html.contains(DIVIDER));
@@ -366,95 +354,16 @@ class BilingualBotTest {
     }
 
     @Test
-    void englishAndPersianPlayersShareARoomAndEachReadsTheirOwnLanguage() {
+    void playersWithOtherLanguagesPlayInTheHostsLanguage() {
         languages.setLanguage(alireza.getId(), Language.PERSIAN);
-        languages.setLanguage(ben.getId(), Language.PERSIAN);
         String code = openCaseWithFourPlayers();
 
-        // The opening in the group carries both languages, the secret roles only one.
-        Shown opened = telegram.find(GROUP, EN.get("case.open.title", code)).orElseThrow();
-        assertTrue(opened.html.contains(FA.get("case.open.title", code)));
-        assertEquals("banner-case-open.jpg", opened.banner, "a shared message uses the default artwork");
         for (User user : table) {
-            Texts other = t(user) == EN ? FA : EN;
-            assertTrue(telegram.chat(user.getId()).stream().noneMatch(shown -> shown.html.contains(DIVIDER)),
-                    "private messages are never doubled");
-            assertFalse(telegram.chat(user.getId()).stream()
-                            .anyMatch(shown -> shown.html.contains(other.get("brief.next.investigator"))
-                                    || shown.html.contains(other.get("brief.next.murderer"))
-                                    || shown.html.contains(other.get("brief.next.forensic_scientist"))),
-                    user.getFirstName() + " got a briefing in the wrong language");
+            assertEquals(Language.PERSIAN, languages.languageOf(user.getId()), user.getFirstName());
         }
-
-        Cast cast = playToTheReport();
-
-        // The scene report: both languages in one message, every button with both labels.
-        Shown report = cast.report;
-        assertTrue(report.html.contains(EN.get("report.title")) && report.html.contains(FA.get("report.title")));
-        assertEquals(1, countOccurrences(report.html, DIVIDER));
-        assertTrue(report.html.contains(EN.tile("Cause of death")));
-        assertTrue(report.html.contains(FA.tile("Cause of death")));
-        String lab = buttonFor(report, "LT:" + GROUP).getText();
-        assertEquals("🔬 " + EN.get("btn.lab_test") + " · " + FA.get("btn.lab_test"), lab);
-
-        // A lab test by a Persian player and one by an English player: same shared result message.
-        User persian = cast.suspects.stream().filter(user -> t(user) == FA).findFirst().orElseThrow();
-        User english = cast.suspects.stream().filter(user -> t(user) == EN).findFirst().orElseThrow();
-        for (User tester : List.of(persian, english)) {
-            press(tester, report, "LT:" + GROUP);
-            Shown flow = telegram.last(GROUP);
-            assertTrue(flow.html.contains(EN.get("lab.who.ask")) && flow.html.contains(FA.get("lab.who.ask")));
-            assertEquals(cast.suspects.stream().map(User::getFirstName).sorted().toList(),
-                    flow.buttons().stream().limit(3).map(InlineKeyboardButton::getText).sorted().toList(),
-                    "a name is the same in both languages and is written once");
-            press(tester, flow, flow.buttons().get(0).getCallbackData());
-            String cardLabel = flow.buttons().get(0).getText();
-            assertTrue(PERSIAN_LETTER.matcher(cardLabel).find() && LATIN_WORD.matcher(cardLabel).find(),
-                    "card buttons carry both names: " + cardLabel);
-            int card = tester == persian ? 0 : 1; // the same card cannot be tested twice
-            press(tester, flow, flow.buttons().get(card).getCallbackData());
-            assertTrue(flow.html.contains(EN.get("lab.result.title")) && flow.html.contains(FA.get("lab.result.title")),
-                    flow.html);
-
-            // A second test in the same round is refused in the language of the one who asked.
-            press(tester, report, "LT:" + GROUP);
-            assertEquals(t(tester).get("err.lab.used"), telegram.lastAnswer().text());
-        }
-
-        // The Forensic Scientist is refused in their own language as well.
-        press(cast.scientist, report, "LT:" + GROUP);
-        assertEquals(t(cast.scientist).get("err.lab.scientist"), telegram.lastAnswer().text());
-
-        // The case file in the private chat is in one language.
-        for (User user : List.of(persian, english)) {
-            say(user, "/rooms");
-            Shown rooms = telegram.last(user.getId());
-            press(user, rooms, "m:case:" + code);
-            Shown file = telegram.last(user.getId());
-            assertTrue(file.html.contains(t(user).get("file.title", code)), file.html);
-            assertFalse(file.html.contains(DIVIDER));
-            if (t(user) == FA) {
-                assertPersianOnly(file, "case file");
-            } else {
-                assertFalse(PERSIAN_LETTER.matcher(file.html).find(), "English case file: " + file.html);
-            }
-        }
-
-        // The verdict carries both languages and the default artwork.
-        accuseCorrectly(cast.investigators.get(0), cast);
-        Shown verdict = telegram.last(GROUP);
-        assertTrue(verdict.html.contains(EN.get("verdict.solved.title", code)));
-        assertTrue(verdict.html.contains(FA.get("verdict.solved.title", code)));
-        assertEquals("banner-case-solved.jpg", verdict.banner);
-        String newCase = verdict.buttons().get(0).getText();
-        assertTrue(newCase.contains(EN.get("btn.new_case")) && newCase.contains(FA.get("btn.new_case")), newCase);
-
-        // Statistics are stored once, without a language, and shown to each reader in theirs.
-        assertEquals(1, stats.statsOf(cast.investigators.get(0).getId()).orElseThrow().getCasesSolved());
-        say(persian, "/leaderboard");
-        assertPersianOnly(telegram.last(persian.getId()), "leaderboard");
-        say(english, "/leaderboard");
-        assertFalse(PERSIAN_LETTER.matcher(telegram.last(english.getId()).html).find());
+        Shown opened = telegram.find(GROUP, FA.get("case.open.title", code)).orElseThrow();
+        assertFalse(opened.html.contains(DIVIDER), "one language for the whole room");
+        assertPersianOnly(opened, "case opening");
     }
 
     @Test
@@ -557,6 +466,9 @@ class BilingualBotTest {
 
     private String createRoom() {
         group(alireza, "/newgame");
+        // The host first picks the room language: the one they already use.
+        String language = languages.languageOf(alireza.getId()).code();
+        press(alireza, telegram.last(GROUP), "r:lang:" + language + ":" + alireza.getId());
         Matcher matcher = Pattern.compile("r:join:([A-Z0-9]{4})").matcher(
                 roomCard().buttons().stream().map(InlineKeyboardButton::getCallbackData)
                         .filter(data -> data != null).reduce("", (a, b) -> a + " " + b));

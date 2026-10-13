@@ -8,6 +8,7 @@ import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.ui.*;
 import de.winona.telegrambot.util.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
+import de.winona.telegrambot.i18n.Language;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,35 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Creating a room
 
+    /**
+     * First step of /newgame: the host chooses the language before the room opens.
+     */
+    public void askRoomLanguage(long groupChatId, User creator) {
+        if (gameService.getGame(groupChatId).isPresent()) {
+            sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
+            return;
+        }
+        Optional<Lobby> existing = lobbyService.getLobby(groupChatId);
+        if (existing.isPresent()) {
+            postRoomCard(existing.get());
+            return;
+        }
+        messenger.send(groupChatId, GameScreens.roomLanguage(Texts.of(Language.DEFAULT), creator.getId()));
+    }
+
+    private void chooseRoomLanguage(Click click) {
+        if (click.message() == null) {
+            click.alert("err.button_invalid");
+            return;
+        }
+        if (click.userId() != click.longPart(3)) {
+            click.alert("err.only_host_language");
+            return;
+        }
+        localizer.setLanguage(click.userId(), Language.fromCode(click.part(2)));
+        messenger.delete(click.message());
+        createRoom(click.message().chatId(), click.chatTitle(), click.user());
+    }
     /**
      * Opens a room in a group and posts its room card.
      */
@@ -131,6 +161,8 @@ public class RoomController {
         if (lobby.isFull()) {
             return JoinOutcome.FULL;
         }
+        // Everyone in a room plays in the host's language, so group messages stay in one language.
+        localizer.setLanguage(user.getId(), localizer.languageOf(lobby.getRoom().host().userId()));
         if (confirmInPrivate && messenger.send(user.getId(), seatConfirmation(user.getId(), lobby)).isEmpty()) {
             return JoinOutcome.NEEDS_PRIVATE_CHAT;
         }
@@ -310,8 +342,9 @@ public class RoomController {
                     click.alert("err.create_in_group");
                     return;
                 }
-                createRoom(click.message().chatId(), click.chatTitle(), click.user());
+                askRoomLanguage(click.message().chatId(), click.user());
             }
+            case "lang" -> chooseRoomLanguage(click);
             case "join" -> onJoinClick(click, code);
             case "leave" -> {
                 click.toast(leave(code, click.user()));
@@ -343,7 +376,8 @@ public class RoomController {
         JoinOutcome outcome = join(code, click.user(), !click.inPrivateChat());
         switch (outcome) {
             case JOINED -> {
-                click.toast(outcome.message(code));
+                // The player now reads the room's language, so the pop-up uses it too.
+                click.toastText(localizer.textsFor(click.userId()).get(outcome.message(code)));
                 refreshPrivateRoomScreen(click, code);
             }
             case ALREADY_SEATED -> click.toast(outcome.message(code));
@@ -375,7 +409,7 @@ public class RoomController {
             return;
         }
         lobbyService.findByCode(code).ifPresent(lobby -> messenger.show(click.message(),
-                MenuScreens.roomDetails(click.texts(), RoomSummary.of(lobby), click.userId())));
+                MenuScreens.roomDetails(localizer.textsFor(click.userId()), RoomSummary.of(lobby), click.userId())));
     }
 
     // ---------------------------------------------------------------- Who sees what, in which language

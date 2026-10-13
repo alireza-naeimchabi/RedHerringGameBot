@@ -29,6 +29,10 @@ public class Localizer {
         languages.setLanguage(userId, language);
     }
 
+    public Language languageOf(long userId) {
+        return languages.languageOf(userId);
+    }
+
     public Texts textsFor(long userId) {
         return Texts.of(languages.languageOf(userId));
     }

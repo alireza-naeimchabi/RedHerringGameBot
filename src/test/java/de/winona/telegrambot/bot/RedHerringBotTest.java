@@ -404,8 +404,13 @@ class RedHerringBotTest {
         StatsService reloaded = new StatsService(tempDir.resolve("stats.properties"));
         assertEquals(1, reloaded.statsOf(solver.getUserId()).orElseThrow().getWins());
 
-        // The group is free for the next room.
+        // The group is free for the next room: whoever asks for it picks its language.
         press(sara, verdict, verdict.button("New Case").orElseThrow().getCallbackData());
+        Shown picker = telegram.last(GROUP);
+        assertTrue(picker.html.contains("GAME LANGUAGE"));
+        press(alireza, picker, "r:lang:en:" + sara.getId());
+        assertTrue(telegram.lastAnswer().alert(), "only the one who asked for the room picks its language");
+        press(sara, picker, "r:lang:en:" + sara.getId());
         assertTrue(telegram.last(GROUP).html.contains("Waiting for detectives"));
     }
 
@@ -547,7 +552,7 @@ class RedHerringBotTest {
         assertEquals(before, telegram.chat(GROUP).size());
 
         group(alireza, "/newgame@" + FakeTelegram.BOT_USERNAME);
-        assertTrue(telegram.last(GROUP).html.contains("Waiting for detectives"));
+        assertTrue(telegram.last(GROUP).html.contains("GAME LANGUAGE"), "the bot asks for the room language");
     }
 
     // ---------------------------------------------------------------- Helpers
@@ -571,6 +576,7 @@ class RedHerringBotTest {
      */
     private String createRoom() {
         group(alireza, "/newgame");
+        press(alireza, telegram.last(GROUP), "r:lang:en:" + alireza.getId());
         Matcher matcher = Pattern.compile("ROOM ([A-Z0-9]{4})").matcher(roomCard().html);
         assertTrue(matcher.find(), roomCard().html);
         return matcher.group(1);
