@@ -117,6 +117,7 @@ public class GameController {
             case Callbacks.LAB_SUSPECT -> onLabSuspectChosen(click, game);
             case Callbacks.LAB_CARD -> onLabCardChosen(click, game);
             case Callbacks.LAB_CANCEL -> onLabCancelled(click, game);
+            case Callbacks.SKIP_TURN -> onSkipTurn(click, game);
             case Callbacks.ACCUSE_START -> startAccusation(game, click.user()).ifPresent(click::alert);
             case Callbacks.ACCUSE_SUSPECT -> onAccusationStep(click, game);
             case Callbacks.ACCUSE_WEAPON -> onAccusationStep(click, game);
@@ -209,7 +210,7 @@ public class GameController {
         }
 
         if (tileOpt.isEmpty()) {
-            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+            publishReport(game);
             presentPrivately(scientist, inPlace, t -> GameScreens.tilesPlaced(t, game));
             return;
         }
@@ -277,7 +278,7 @@ public class GameController {
         }
 
         if (replacesOldAnswer) {
-            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+            publishReport(game);
             sendPrivately(scientist, t -> GameScreens.tilesPlaced(t, game));
         } else {
             Hint placed = game.getHints().get(game.getHints().size() - 1);
@@ -344,6 +345,50 @@ public class GameController {
         return Pattern.compile("(?iU)(?<!\\w)" + Pattern.quote(word) + "(?!\\w)").matcher(text).find();
     }
 
+    // ---------------------------------------------------------------- Turns
+
+    /**
+     * Publishes the scene report and hands the first turn to the first suspect.
+     */
+    private void publishReport(Game game) {
+        sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+        announceTurn(game);
+    }
+
+    /**
+     * Tells the group whose turn it is, or that the round is over once every suspect had a turn.
+     */
+    private void announceTurn(Game game) {
+        Optional<Player> next = game.getCurrentTurn();
+        if (next.isPresent()) {
+            sendToGroup(game, t -> GameScreens.turnAnnouncement(t, game, next.get()));
+        } else {
+            sendToGroup(game, t -> GameScreens.roundEnded(t, game));
+        }
+    }
+
+    /**
+     * The player skips their own turn, or the host or the Forensic Scientist skips an absent player.
+     */
+    private void onSkipTurn(Click click, Game game) {
+        Optional<Player> current = game.getCurrentTurn();
+        if (current.isEmpty() || click.intPart(2) != game.getRound() || click.intPart(3) != game.getTurnIndex()) {
+            click.alert("err.button_invalid");
+            return;
+        }
+        Player player = current.get();
+        boolean ownTurn = player.userId() == click.userId();
+        boolean overseer = game.getRoom().isHost(click.userId())
+                || game.getForensicScientist().userId() == click.userId();
+        if (!ownTurn && !overseer) {
+            click.alert("err.turn.not_yours", player.name());
+            return;
+        }
+        game.endTurn();
+        showToGroup(click, game, t -> GameScreens.turnSkipped(t, player));
+        announceTurn(game);
+    }
+
     // ---------------------------------------------------------------- Rounds
 
     public void nextRoundByCommand(long groupChatId, User user) {
@@ -373,6 +418,9 @@ public class GameController {
         if (!game.allHintsGiven() || game.isReplacementPending()) {
             return Optional.of(Msg.of("err.round_not_finished"));
         }
+        if (!game.isDiscussion()) {
+            return Optional.of(Msg.of("err.round.turns"));
+        }
         if (game.isLastRound()) {
             if (inPlace != null) {
                 messenger.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
@@ -389,7 +437,7 @@ public class GameController {
             int replaceable = game.getHints().size() - Game.FIXED_TILES;
             game.chooseSlotToReplace(Game.FIXED_TILES + random.nextInt(replaceable));
             game.addReplacementHint(random.nextInt(game.getPendingTile().options().size()));
-            sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+            publishReport(game);
             return Optional.empty();
         }
         presentPrivately(scientist, inPlace, t -> GameScreens.chooseNewTile(t, game));
@@ -443,7 +491,7 @@ public class GameController {
             return;
         }
         game.addReplacementHint(optionIndex);
-        sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+        publishReport(game);
         showToClicker(click, t -> GameScreens.tilesPlaced(t, game));
     }
 
@@ -501,6 +549,11 @@ public class GameController {
         }
         if (!game.hasTestLeft(userId)) {
             return Optional.of(Msg.of("err.lab.used"));
+        }
+        if (!game.isTurnOf(userId)) {
+            return Optional.of(game.getCurrentTurn()
+                    .map(player -> Msg.of("err.turn.not_yours", player.name()))
+                    .orElse(Msg.of("err.turn.over")));
         }
         return Optional.empty();
     }
@@ -567,6 +620,8 @@ public class GameController {
         }
         LabResult result = game.testCard(tester.get().userId(), owner, card);
         showToGroup(click, game, t -> GameScreens.labResult(t, game, result));
+        game.endTurn();
+        announceTurn(game);
     }
 
     private void onLabCancelled(Click click, Game game) {
@@ -613,6 +668,9 @@ public class GameController {
         }
         if (game.hasAccused(userId)) {
             return Optional.of(Msg.of("err.accuse.used"));
+        }
+        if (!game.isDiscussion()) {
+            return Optional.of(Msg.of("err.accuse.wait"));
         }
         return Optional.empty();
     }

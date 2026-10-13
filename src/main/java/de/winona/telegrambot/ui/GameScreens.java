@@ -784,4 +784,44 @@ public final class GameScreens {
         }
         return t.banner(Banner.ROOMS, text, Keyboard.create().grid(choices, 3).build());
     }
+
+    // ---------------------------------------------------------------- Turns (group)
+
+    /**
+     * Whose turn it is: test one card or skip. The host and the Forensic Scientist may skip an absent player.
+     */
+    public static Screen turnAnnouncement(Texts t, Game game, Player player) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_ROUND + " " + t.get("turn.title", bold(name(t, player))) + "\n"
+                + italic(t.get("turn.progress", game.getRound(), game.getTurnIndex() + 1,
+                game.getTurnOrder().size())) + "\n\n"
+                + t.get("turn.body") + "\n\n"
+                + italic(t.get("turn.skip_note"));
+        return t.text(text, Keyboard.create()
+                .row(button(Theme.ICON_LAB + " " + t.get("btn.lab_test"), Callbacks.game(Callbacks.LAB_START, chatId)),
+                        button("⏩ " + t.get("btn.skip_turn"),
+                                Callbacks.game(Callbacks.SKIP_TURN, chatId, game.getRound(), game.getTurnIndex())))
+                .build());
+    }
+
+    public static Screen turnSkipped(Texts t, Player player) {
+        return t.text("⏩ " + t.get("turn.skipped", esc(name(t, player))));
+    }
+
+    /**
+     * Every suspect has had a turn: the investigators may solve the crime, or the scientist moves on.
+     */
+    public static Screen roundEnded(Texts t, Game game) {
+        long chatId = game.getRoom().groupChatId();
+        String text = Theme.ICON_ROUND + " " + bold(t.get("roundend.title", game.getRound(), Game.MAX_ROUNDS))
+                + "\n\n"
+                + Theme.ICON_ACCUSE + " " + t.get("roundend.solve") + "\n"
+                + Theme.ICON_SCIENTIST + " " + t.get(game.isLastRound() ? "roundend.final" : "roundend.next");
+        return t.text(text, Keyboard.create()
+                .row(button(Theme.ICON_ACCUSE + " " + t.get("btn.solve"), Callbacks.game(Callbacks.ACCUSE_START, chatId)),
+                        nextRoundButton(t, game, chatId))
+                .row(button(Theme.ICON_ROOMS + " " + t.get("btn.evidence_board"),
+                        Callbacks.game(Callbacks.EVIDENCE_BOARD, chatId)))
+                .build());
+    }
 }
