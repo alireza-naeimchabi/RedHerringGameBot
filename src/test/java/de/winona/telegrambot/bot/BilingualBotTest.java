@@ -430,8 +430,9 @@ class BilingualBotTest {
         return newestTurnMessage().orElseThrow(() -> new AssertionError("no turn announcement in the group"));
     }
     private User currentTurn() {
-        Shown turn = turnMessage();
-        return table.stream().filter(user -> turn.html.contains(user.getFirstName())).findFirst().orElseThrow();
+        // The first line names the player on turn; the progress row below lists everyone.
+        String firstLine = turnMessage().html.split("\n")[0];
+        return table.stream().filter(user -> firstLine.contains(user.getFirstName())).findFirst().orElseThrow();
     }
 
     /**

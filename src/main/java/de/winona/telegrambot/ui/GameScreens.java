@@ -794,7 +794,8 @@ public final class GameScreens {
         long chatId = game.getRoom().groupChatId();
         String text = Theme.ICON_ROUND + " " + t.get("turn.title", bold(name(t, player))) + "\n"
                 + italic(t.get("turn.progress", game.getRound(), game.getTurnIndex() + 1,
-                game.getTurnOrder().size())) + "\n\n"
+                game.getTurnOrder().size())) + "\n"
+                + turnProgress(t, game) + "\n\n"
                 + t.get("turn.body") + "\n\n"
                 + italic(t.get("turn.skip_note"));
         return t.text(text, Keyboard.create()
@@ -802,6 +803,19 @@ public final class GameScreens {
                         button("⏩ " + t.get("btn.skip_turn"),
                                 Callbacks.game(Callbacks.SKIP_TURN, chatId, game.getRound(), game.getTurnIndex())))
                 .build());
+    }
+
+    /**
+     * One mark per suspect: done, on turn or still waiting, in seat order.
+     */
+    private static String turnProgress(Texts t, Game game) {
+        List<Player> order = game.getTurnOrder();
+        List<String> marks = new ArrayList<>();
+        for (int i = 0; i < order.size(); i++) {
+            String mark = i < game.getTurnIndex() ? "✅" : i == game.getTurnIndex() ? "▶️" : "⏳";
+            marks.add(mark + " " + esc(name(t, order.get(i))));
+        }
+        return String.join("  ", marks);
     }
 
     public static Screen turnSkipped(Texts t, Player player) {
