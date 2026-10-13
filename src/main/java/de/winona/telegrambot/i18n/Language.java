@@ -8,7 +8,7 @@ import java.util.Arrays;
 public enum Language {
     ENGLISH("en", "English", "🇬🇧", false),
     GERMAN("de", "Deutsch", "🇩🇪", false),
-    PERSIAN("fa", "فارسی", "🇮🇷", true);
+    PERSIAN("fa", "فارسی", "🦁☀️", true);
 
     /**
      * Used for everyone who has not chosen a language.
