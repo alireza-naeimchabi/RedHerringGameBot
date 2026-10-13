@@ -24,9 +24,12 @@ public enum Banner {
     }
 
     public String resourcePath(Language language) {
+        String defaultPath = "/ui/" + fileName;
         if (language == null || language == Language.DEFAULT) {
-            return "/ui/" + fileName;
+            return defaultPath;
         }
-        return "/ui/" + language.code() + "/" + fileName;
+        String localizedPath = "/ui/" + language.code() + "/" + fileName;
+        // Fall back to the default banner if this language has no own artwork yet.
+        return Banner.class.getResource(localizedPath) != null ? localizedPath : defaultPath;
     }
 }

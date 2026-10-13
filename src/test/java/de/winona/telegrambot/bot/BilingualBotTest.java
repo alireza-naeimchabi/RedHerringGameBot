@@ -707,7 +707,10 @@ class BilingualBotTest {
             }
         }
         for (InlineKeyboardButton button : shown.buttons()) {
-            String label = button.getText().replace("Language", "").replace("English", "");
+            String label = button.getText().replace("Language", "").replace("Sprache", "");
+            for (Language language : Language.values()) {
+                label = label.replace(language.nativeName(), "");
+            }
             for (User user : List.of(alireza, sara, ben, clara, dana)) {
                 label = label.replace(user.getFirstName(), "");
             }
