@@ -88,7 +88,7 @@ class BilingualBotTest {
 
         assertTrue(screen.html.contains(EN.get("lang.title")));
         assertEquals("🇬🇧 English ✓", buttonFor(screen, "m:setlang:en").getText());
-        assertEquals("🇮🇷 فارسی", buttonFor(screen, "m:setlang:fa").getText());
+        assertEquals("\uD83E\uDD81☀\uFE0F فارسی", buttonFor(screen, "m:setlang:fa").getText());
     }
 
     @Test
@@ -120,10 +120,10 @@ class BilingualBotTest {
         say(alireza, "/profile");
         Shown screen = telegram.last(alireza.getId());
         assertTrue(screen.html.contains(FA.get("profile.title")));
-        assertTrue(screen.html.contains("🇮🇷 فارسی"));
+        assertTrue(screen.html.contains("\uD83E\uDD81☀\uFE0F فارسی"));
 
         press(alireza, screen, "m:lang");
-        assertEquals("🇮🇷 فارسی ✓", buttonFor(screen, "m:setlang:fa").getText());
+        assertEquals("\uD83E\uDD81☀\uFE0F فارسی ✓", buttonFor(screen, "m:setlang:fa").getText());
         press(alireza, screen, "m:setlang:en");
 
         assertEquals(EN.get("lang.changed"), telegram.lastAnswer().text());
