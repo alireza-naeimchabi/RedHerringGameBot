@@ -294,6 +294,7 @@ class RedHerringBotTest {
         }
         tile = telegram.find(scientist.getId(), "ROUND 1 REPORT IS OUT").orElseThrow();
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
+        assertTrue(telegram.isPinned(report), "the scene report stays on top of the group");
         assertEquals(3, countOccurrences(report.html, "🔪 "));
         assertEquals(3, countOccurrences(report.html, "🔍 "));
         String wrongClue = otherClueOf(murderer, crime.keyEvidence);

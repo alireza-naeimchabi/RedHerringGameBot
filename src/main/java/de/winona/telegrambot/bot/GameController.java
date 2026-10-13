@@ -348,10 +348,12 @@ public class GameController {
     // ---------------------------------------------------------------- Turns
 
     /**
-     * Publishes the scene report and hands the first turn to the first suspect.
+     * Publishes the scene report, pins it so it stays on top, and hands the first turn to the first suspect.
      */
     private void publishReport(Game game) {
-        sendToGroup(game, t -> GameScreens.sceneReport(t, game));
+        messenger.send(game.getRoom().groupChatId(),
+                        localizer.forPlayers(game.getRoles().keySet(), t -> GameScreens.sceneReport(t, game)))
+                .ifPresent(messenger::pin);
         announceTurn(game);
     }
 

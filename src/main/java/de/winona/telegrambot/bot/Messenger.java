@@ -22,6 +22,7 @@ import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import org.telegram.telegrambots.meta.api.methods.pinnedmessages.PinChatMessage;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -192,6 +193,23 @@ public class Messenger {
                     .build());
         } catch (TelegramApiException e) {
             log.debug("Could not delete message {} in chat {}: {}",
+                    target.messageId(), target.chatId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Pins a message in its chat without notifying anyone. Telegram only allows this if the bot
+     * is an admin with the right to pin; otherwise nothing happens and the game goes on.
+     */
+    public void pin(MessageRef target) {
+        try {
+            client.execute(PinChatMessage.builder()
+                    .chatId(target.chatId())
+                    .messageId(target.messageId())
+                    .disableNotification(true)
+                    .build());
+        } catch (TelegramApiException e) {
+            log.debug("Could not pin message {} in chat {}: {}",
                     target.messageId(), target.chatId(), e.getMessage());
         }
     }
