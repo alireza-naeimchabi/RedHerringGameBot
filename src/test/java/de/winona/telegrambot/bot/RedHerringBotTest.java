@@ -282,7 +282,8 @@ class RedHerringBotTest {
         Shown tile = telegram.find(scientist.getId(), "SCENE TILE 1 OF 6").orElseThrow();
         assertTrue(tile.html.contains("Cause of death"));
         assertTrue(tile.html.contains("describes the Means of Murder: <b>" + crime.means + "</b>"));
-        assertTrue(tile.buttons().isEmpty(), "the Forensic Scientist types the answer");
+        assertEquals(tile.html.contains("Cause of death") ? 3 : tile.buttons().size(), tile.buttons().size());
+        assertFalse(tile.buttons().isEmpty(), "the options can be pressed, or an answer typed");
         say(scientist, "It was the " + crime.means);
         assertTrue(telegram.last(scientist.getId()).html.contains("names a player or a card"),
                 "an answer must not name a card");
@@ -363,7 +364,7 @@ class RedHerringBotTest {
         assertEquals(5, tile.buttons().size(), "only Cause of death cannot be replaced");
         press(scientist, tile, tile.buttons().get(0).getCallbackData());
         assertTrue(tile.html.contains("NEW SCENE TILE"));
-        assertTrue(tile.buttons().isEmpty(), "the new answer is typed as well");
+        assertFalse(tile.buttons().isEmpty(), "the new tile offers its options as buttons too");
         say(scientist, "A new typed answer");
         Shown secondReport = lastWith("SCENE REPORT");
         assertTrue(secondReport.html.contains("round 2 of 3"));
