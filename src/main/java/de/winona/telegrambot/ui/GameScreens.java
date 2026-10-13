@@ -310,7 +310,9 @@ public final class GameScreens {
             text.append("\n");
         }
         text.append(tileQuestion(t, game, tile));
-        return t.text(text.toString());
+        String prefix = Callbacks.game(Callbacks.HINT, game.getRoom().groupChatId(), game.getCurrentHintIndex())
+                + Callbacks.SEPARATOR;
+        return t.text(text.toString(), optionButtons(t, tile, prefix));
     }
 
     public static Screen tilesPlaced(Texts t, Game game) {
@@ -370,7 +372,9 @@ public final class GameScreens {
     public static Screen replacementTile(Texts t, Game game, HintTile tile) {
         String text = Theme.ICON_SCIENTIST + " " + bold(t.get("newtile.title")) + "\n\n"
                 + tileQuestion(t, game, tile);
-        return t.text(text);
+        String prefix = Callbacks.game(Callbacks.REPLACEMENT_HINT, game.getRoom().groupChatId(), game.getRound())
+                + Callbacks.SEPARATOR;
+        return t.text(text, optionButtons(t, tile, prefix));
     }
 
     public static Screen caseClosedByScientist(Texts t) {
@@ -466,6 +470,17 @@ public final class GameScreens {
                 + describes + "\n"
                 + t.get("tile.type", Game.MAX_ANSWER_LENGTH) + "\n"
                 + italic(t.get("tile.examples", examples(t, tile)));
+    }
+
+    /**
+     * One button per option of the tile. The Forensic Scientist presses one or types their own answer.
+     */
+    private static InlineKeyboardMarkup optionButtons(Texts t, HintTile tile, String prefix) {
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        for (int i = 0; i < tile.options().size(); i++) {
+            buttons.add(button(t.option(tile.options().get(i)), prefix + i));
+        }
+        return Keyboard.create().grid(buttons, 2).build();
     }
 
     /**
