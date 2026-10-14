@@ -23,7 +23,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import de.winona.telegrambot.presenter.ChatUser;
 import de.winona.telegrambot.presenter.Presenter;
-
+import java.time.Duration;
 /**
  * Entry point for everything Telegram sends. This class only decides who is responsible:
  * the dashboard ({@link MenuController}), the rooms ({@link RoomController})
@@ -33,6 +33,11 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(RedHerringBot.class);
 
+    /**
+     * Pause between two frames of an animation in the real bot.
+     */
+    private static final Duration ANIMATION_FRAME = Duration.ofMillis(700);
+
     private final Messenger messenger;
     private final Localizer localizer;
     private final MenuController menuController;
@@ -40,23 +45,30 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
     private final GameController gameController;
 
     public RedHerringBot(String botToken) {
-        this(new OkHttpTelegramClient(botToken), new StatsService(), new LanguageService());
+        this(new OkHttpTelegramClient(botToken), new StatsService(), new LanguageService(), ANIMATION_FRAME);
         messenger.registerCommands();
     }
 
-    /**
-     * For tests: their own Telegram client and statistics file, language choices kept in memory.
-     */
+    /** For tests: their own Telegram client and statistics file, language choices kept in memory. */
     public RedHerringBot(TelegramClient telegramClient, StatsService statsService) {
         this(telegramClient, statsService, LanguageService.inMemory());
     }
 
+    /** For tests: animations run without pauses, so the tests stay fast. */
     public RedHerringBot(TelegramClient telegramClient, StatsService statsService,
                          LanguageService languageService) {
+        this(telegramClient, statsService, languageService, Duration.ZERO);
+    }
+
+    /**
+     * Wires the whole bot together: the Telegram adapter, the View and the three presenters.
+     */
+    private RedHerringBot(TelegramClient telegramClient, StatsService statsService,
+                          LanguageService languageService, Duration frameDelay) {
         LobbyService lobbyService = new LobbyService();
         GameService gameService = new GameService();
 
-        this.messenger = new Messenger(telegramClient);
+        this.messenger = new Messenger(telegramClient, frameDelay);
         this.localizer = new Localizer(languageService);
         this.gameController = new GameController(messenger, localizer, gameService, statsService);
         this.roomController = new RoomController(messenger, localizer, lobbyService, gameService, gameController);

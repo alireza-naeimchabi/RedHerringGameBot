@@ -28,6 +28,7 @@ import org.telegram.telegrambots.meta.api.methods.pinnedmessages.PinChatMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.*;
 import de.winona.telegrambot.view.Button;
 import de.winona.telegrambot.view.ButtonGrid;
@@ -52,8 +53,18 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
     private final Map<String, String> uploadedBanners = new HashMap<>();
     private String botUsername;
 
+    /**
+     * Pause between two frames of an animation. Zero in tests, so they stay fast.
+     */
+    private final Duration frameDelay;
+
     public Messenger(TelegramClient client) {
+        this(client, Duration.ZERO);
+    }
+
+    public Messenger(TelegramClient client, Duration frameDelay) {
         this.client = client;
+        this.frameDelay = frameDelay;
     }
 
     // ---------------------------------------------------------------- Sending
@@ -98,6 +109,29 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
         }
         delete(target);
         return send(target.chatId(), screen);
+    }
+    @Override
+    public Optional<MessageRef> animate(MessageRef target, List<Screen> frames) {
+        Optional<MessageRef> shown = Optional.ofNullable(target);
+        for (Screen frame : frames) {
+            if (shown.isEmpty()) {
+                return shown;
+            }
+            shown = show(shown.get(), frame);
+            pause();
+        }
+        return shown;
+    }
+
+    private void pause() {
+        if (frameDelay.isZero()) {
+            return;
+        }
+        try {
+            Thread.sleep(frameDelay.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private Optional<MessageRef> sendText(long chatId, Screen screen) {

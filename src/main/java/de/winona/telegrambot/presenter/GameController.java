@@ -32,6 +32,8 @@ public class GameController extends Presenter {
     private final StatsService statsService;
     private final Random random = new Random();
 
+    private static final int LAB_FRAMES = 4;
+
     public GameController(ChatView chatView, Localizer localizer, GameService gameService,
                           StatsService statsService) {
         super(chatView, localizer);
@@ -616,6 +618,13 @@ public class GameController extends Presenter {
             return;
         }
         LabResult result = game.testCard(tester.get().userId(), owner, card);
+        List<Screen> frames = new ArrayList<>();
+        for (int step = 1; step <= LAB_FRAMES; step++) {
+            int filled = step;
+            frames.add(localizer.forPlayers(game.getRoles().keySet(),
+                    t -> GameScreens.labAnalysing(t, result, filled, LAB_FRAMES)));
+        }
+        chatView.animate(click.message(), frames);
         showToGroup(click, game, t -> GameScreens.labResult(t, game, result));
         game.endTurn();
         announceTurn(game);

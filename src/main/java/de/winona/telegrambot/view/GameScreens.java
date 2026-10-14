@@ -564,6 +564,18 @@ public final class GameScreens {
                 + finding + "\n\n"
                 + italic(t.get("lab.used", game.getTestsUsedThisRound(), game.getTestsPerRound())));
     }
+    /**
+     * One frame of the lab animation: the card is in the machine and the bar fills up.
+     */
+    public static Screen labAnalysing(Texts t, LabResult result, int step, int steps) {
+        String bar = "▰".repeat(step) + "▱".repeat(steps - step);
+        return t.text(Theme.ICON_LAB + " " + bold(t.get("lab.result.title"))
+                + italic("  " + t.get("lab.result.round", result.round())) + "\n"
+                + t.get("lab.result.tested", esc(name(t, result.tester())),
+                cardIcon(result.card()) + " " + bold(t.card(result.card())),
+                bold(name(t, result.owner()))) + "\n\n"
+                + t.get("lab.analysing") + "\n" + bar);
+    }
 
     public static Screen labCancelled(Texts t, Player tester) {
         return t.text(Theme.ICON_LAB + " " + t.get("lab.cancelled", esc(name(t, tester))));
