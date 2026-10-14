@@ -6,7 +6,7 @@ import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.ui.*;
-import de.winona.telegrambot.util.RoomCodeGenerator;
+import de.winona.telegrambot.service.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 import de.winona.telegrambot.i18n.Language;
 

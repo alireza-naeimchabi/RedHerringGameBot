@@ -10,7 +10,7 @@ import de.winona.telegrambot.service.StatsService;
 import de.winona.telegrambot.ui.MenuScreens;
 import de.winona.telegrambot.ui.RoomSummary;
 import de.winona.telegrambot.ui.Screen;
-import de.winona.telegrambot.util.RoomCodeGenerator;
+import de.winona.telegrambot.service.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 
 import java.util.*;

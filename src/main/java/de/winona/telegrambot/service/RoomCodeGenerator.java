@@ -1,4 +1,4 @@
-package de.winona.telegrambot.util;
+package de.winona.telegrambot.service;
 
 import java.util.Locale;
 import java.util.Random;

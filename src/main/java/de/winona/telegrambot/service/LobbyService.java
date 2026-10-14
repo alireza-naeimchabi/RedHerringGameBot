@@ -4,7 +4,6 @@ import de.winona.telegrambot.model.Lobby;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.Room;
 import de.winona.telegrambot.model.RoomEnd;
-import de.winona.telegrambot.util.RoomCodeGenerator;
 
 import java.time.Clock;
 import java.time.Instant;

@@ -1,8 +1,7 @@
-package de.winona.telegrambot.util;
+package de.winona.telegrambot.ui;
 
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.Card;
-import de.winona.telegrambot.ui.Keyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
