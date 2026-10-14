@@ -24,6 +24,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import org.telegram.telegrambots.meta.api.methods.pinnedmessages.PinChatMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendDice;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,6 +122,19 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
             pause();
         }
         return shown;
+    }
+
+    @Override
+    public void sendDice(long chatId) {
+        try {
+            client.execute(SendDice.builder().chatId(chatId).emoji("🎲").build());
+        } catch (TelegramApiException e) {
+            log.debug("Could not send a dice to chat {}: {}", chatId, e.getMessage());
+        }
+        // Let the dice roll before the next message arrives (no pause in tests).
+        pause();
+        pause();
+        pause();
     }
 
     private void pause() {

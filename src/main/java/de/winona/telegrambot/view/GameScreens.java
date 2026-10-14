@@ -140,6 +140,13 @@ public final class GameScreens {
 
     // ---------------------------------------------------------------- Case opening
 
+    /**
+     * Shown in the group right before the dice rolls and the roles are dealt.
+     */
+    public static Screen dealingRoles(Texts t) {
+        return t.text("🎲 " + bold(t.get("case.dealing")));
+    }
+
     public static Screen caseOpened(Texts t, GameState game) {
         String suspects = game.getSuspects().stream()
                 .map(player -> esc(name(t, player)))
@@ -674,6 +681,13 @@ public final class GameScreens {
     }
 
     // ---------------------------------------------------------------- Verdict (group)
+
+    /**
+     * The pause before the verdict: the court deliberates, one more dot per frame.
+     */
+    public static Screen courtDeliberates(Texts t, int dots) {
+        return t.text("⚖️ " + bold(t.get("verdict.deliberating") + ".".repeat(dots)));
+    }
 
     public static Screen caseSolved(Texts t, GameState game, Player solver) {
         String text = Theme.ICON_OK + " " + bold(t.get("verdict.solved.title", game.getRoom().code())) + "\n"

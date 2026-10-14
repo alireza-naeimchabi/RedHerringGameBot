@@ -45,6 +45,8 @@ public class GameController extends Presenter {
 
     public void openCase(Room room, List<Player> players, Player forcedPlayer, Role forcedRole) {
         Game game = gameService.startGame(room, players, forcedPlayer, forcedRole);
+        sendToGroup(game, GameScreens::dealingRoles);
+        chatView.sendDice(game.getRoom().groupChatId());
 
         game.getRoles().forEach((player, role) ->
                 sendPrivately(player, t -> GameScreens.roleBriefing(t, game, role)));
@@ -780,7 +782,21 @@ public class GameController extends Presenter {
     /**
      * Publishes the verdict, counts the result and frees the group for a new room.
      */
+    /**
+     * A short drumroll in the group before the verdict: the dots appear one after another.
+     */
+    private void drumroll(Game game) {
+        List<Screen> frames = new ArrayList<>();
+        for (int dots = 1; dots <= 3; dots++) {
+            int shown = dots;
+            frames.add(localizer.forPlayers(game.getRoles().keySet(), t -> GameScreens.courtDeliberates(t, shown)));
+        }
+        chatView.send(game.getRoom().groupChatId(), frames.get(0))
+                .ifPresent(message -> chatView.animate(message, frames));
+    }
+
     private void closeCase(Game game, boolean investigatorsWon, Player solver, Msg reasonIfUnsolved) {
+        drumroll(game);
         sendToGroup(game, t -> investigatorsWon
                 ? GameScreens.caseSolved(t, game, solver)
                 : GameScreens.murdererEscaped(t, game, reasonIfUnsolved));
