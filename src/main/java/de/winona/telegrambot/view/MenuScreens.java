@@ -3,8 +3,8 @@ package de.winona.telegrambot.view;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Lobby;
+import de.winona.telegrambot.model.GameState;
+import de.winona.telegrambot.model.LobbyState;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.PlayerStats;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -66,9 +66,9 @@ public final class MenuScreens {
         }
         RoomSummary first = rooms.get(0);
         String line = first.inProgress()
-                ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), Game.MAX_ROUNDS)
+                ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), GameState.MAX_ROUNDS)
                 : Theme.ICON_WAITING + " " + t.get("home.status.room", first.code(),
-                first.players().size(), Lobby.MAX_PLAYERS);
+                first.players().size(), LobbyState.MAX_PLAYERS);
         if (rooms.size() > 1) {
             line += "\n" + t.plural("home.status.more", rooms.size() - 1);
         }
@@ -107,7 +107,7 @@ public final class MenuScreens {
         return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    // ---------------------------------------------------------------- Game rooms
+    // ---------------------------------------------------------------- GameState rooms
 
     public static Screen rooms(Texts t, List<RoomSummary> rooms) {
         StringBuilder text = new StringBuilder();
@@ -147,7 +147,7 @@ public final class MenuScreens {
     }
 
     private static String seatsLine(Texts t, RoomSummary room) {
-        int capacity = room.inProgress() ? room.players().size() : Lobby.MAX_PLAYERS;
+        int capacity = room.inProgress() ? room.players().size() : LobbyState.MAX_PLAYERS;
         return Theme.seats(room.players().size(), capacity) + "  "
                 + t.get("room.seats", room.players().size(), capacity);
     }
@@ -160,7 +160,7 @@ public final class MenuScreens {
         text.append(heading(Theme.ICON_ROOMS, t.get("room.title", room.code()),
                 t.plainName(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH))).append("\n\n");
         text.append(room.inProgress()
-                ? Theme.ICON_LIVE + " " + t.get("room.status.live", room.round(), Game.MAX_ROUNDS)
+                ? Theme.ICON_LIVE + " " + t.get("room.status.live", room.round(), GameState.MAX_ROUNDS)
                 : Theme.ICON_WAITING + " " + t.get("room.status.waiting")).append("\n");
         text.append(seatsLine(t, room)).append("\n\n");
         text.append(playerList(t, room.players(), room)).append("\n");
@@ -172,7 +172,7 @@ public final class MenuScreens {
                 keyboard.row(button(t.get("btn.rejoin"), Callbacks.caseFile(room.code())));
             }
         } else {
-            int missing = Math.max(0, Lobby.MIN_PLAYERS - room.players().size());
+            int missing = Math.max(0, LobbyState.MIN_PLAYERS - room.players().size());
             text.append(note(missing > 0
                     ? t.plural("room.note.missing", missing)
                     : t.get("room.note.ready")));

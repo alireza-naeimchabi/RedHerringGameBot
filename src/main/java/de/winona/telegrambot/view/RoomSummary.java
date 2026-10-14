@@ -1,7 +1,7 @@
 package de.winona.telegrambot.view;
 
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Lobby;
+import de.winona.telegrambot.model.GameState;
+import de.winona.telegrambot.model.LobbyState;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.Room;
 
@@ -12,11 +12,11 @@ import java.util.List;
  */
 public record RoomSummary(Room room, List<Player> players, boolean inProgress, int round) {
 
-    public static RoomSummary of(Lobby lobby) {
+    public static RoomSummary of(LobbyState lobby) {
         return new RoomSummary(lobby.getRoom(), lobby.getPlayers(), false, 0);
     }
 
-    public static RoomSummary of(Game game) {
+    public static RoomSummary of(GameState game) {
         return new RoomSummary(game.getRoom(), List.copyOf(game.getRoles().keySet()), true, game.getRound());
     }
 
