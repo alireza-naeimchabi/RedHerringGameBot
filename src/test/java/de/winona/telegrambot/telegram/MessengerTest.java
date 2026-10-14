@@ -4,6 +4,7 @@ import de.winona.telegrambot.telegram.FakeTelegram.Shown;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.view.Banner;
+import de.winona.telegrambot.view.ChatView;
 import de.winona.telegrambot.view.Screen;
 import org.junit.jupiter.api.Test;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -24,12 +25,12 @@ class MessengerTest {
     private static final Texts FA = Texts.of(Language.PERSIAN);
 
     private final FakeTelegram telegram = new FakeTelegram();
-    private final Messenger messenger = new Messenger(telegram.client());
+    private final ChatView chatView = new Messenger(telegram.client());
 
     @Test
     void everyLanguageGetsItsOwnArtwork() {
-        messenger.send(CHAT, EN.banner(Banner.HOME, "Home", null));
-        messenger.send(CHAT, FA.banner(Banner.HOME, "خانه", null));
+        chatView.send(CHAT, EN.banner(Banner.HOME, "Home", null));
+        chatView.send(CHAT, FA.banner(Banner.HOME, "خانه", null));
 
         List<Shown> shown = telegram.chat(CHAT);
         assertEquals("banner-home.jpg", shown.get(0).banner);
@@ -43,7 +44,7 @@ class MessengerTest {
                 EN.banner(Banner.CASE_OPEN, "The case is open.", keyboard("🔬 Lab Test", "⚖️ Solve the Crime")),
                 FA.banner(Banner.CASE_OPEN, "پرونده باز است.", keyboard("🔬 آزمایش", "⚖️ حل پرونده"))));
 
-        messenger.send(CHAT, merged);
+        chatView.send(CHAT, merged);
 
         Shown message = telegram.last(CHAT);
         assertEquals(1, telegram.chat(CHAT).size());
@@ -65,7 +66,7 @@ class MessengerTest {
                 FA.banner(Banner.CASE_SOLVED, persian, keyboard("🗝 پرونده‌ی جدید"))));
         assertFalse(merged.fitsCaption());
 
-        messenger.send(CHAT, merged);
+        chatView.send(CHAT, merged);
 
         List<Shown> shown = telegram.chat(CHAT);
         assertEquals(2, shown.size());

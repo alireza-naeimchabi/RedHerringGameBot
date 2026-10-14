@@ -1,18 +1,13 @@
 package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.telegram.Click;
-import de.winona.telegrambot.telegram.MessageRef;
-import de.winona.telegrambot.telegram.Messenger;
+import de.winona.telegrambot.view.*;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.StatsService;
-import de.winona.telegrambot.view.Callbacks;
-import de.winona.telegrambot.view.GameScreens;
-import de.winona.telegrambot.view.Screen;
-import de.winona.telegrambot.view.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -34,15 +29,15 @@ public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
-    private final Messenger messenger;
+    private final ChatView chatView;
     private final Localizer localizer;
     private final GameService gameService;
     private final StatsService statsService;
     private final Random random = new Random();
 
-    public GameController(Messenger messenger, Localizer localizer, GameService gameService,
+    public GameController(ChatView chatView, Localizer localizer, GameService gameService,
                           StatsService statsService) {
-        this.messenger = messenger;
+        this.chatView = chatView;
         this.localizer = localizer;
         this.gameService = gameService;
         this.statsService = statsService;
@@ -354,9 +349,9 @@ public class GameController {
      * Publishes the scene report, pins it so it stays on top, and hands the first turn to the first suspect.
      */
     private void publishReport(Game game) {
-        messenger.send(game.getRoom().groupChatId(),
+        chatView.send(game.getRoom().groupChatId(),
                         localizer.forPlayers(game.getRoles().keySet(), t -> GameScreens.sceneReport(t, game)))
-                .ifPresent(messenger::pin);
+                .ifPresent(chatView::pin);
         announceTurn(game);
     }
 
@@ -428,7 +423,7 @@ public class GameController {
         }
         if (game.isLastRound()) {
             if (inPlace != null) {
-                messenger.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
+                chatView.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
             }
             closeCase(game, false, null, Msg.of("verdict.reason.rounds", Game.MAX_ROUNDS));
             return Optional.empty();
@@ -822,26 +817,26 @@ public class GameController {
      * A new message in the group, written for all players of the case.
      */
     private void sendToGroup(Game game, Function<Texts, Screen> view) {
-        messenger.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
+        chatView.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
     /**
      * Changes the group message a button belongs to, written for all players of the case.
      */
     private void showToGroup(Click click, Game game, Function<Texts, Screen> view) {
-        messenger.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
+        chatView.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
     /**
      * Changes the private message a button belongs to, in the language of the player who pressed it.
      */
     private void showToClicker(Click click, Function<Texts, Screen> view) {
-        messenger.show(click.message(), view.apply(click.texts()));
+        chatView.show(click.message(), view.apply(click.texts()));
     }
 
     private void sendPrivately(Player player, Function<Texts, Screen> view) {
         if (!isTestPlayer(player)) {
-            messenger.send(player.userId(), localizer.forUser(player.userId(), view));
+            chatView.send(player.userId(), localizer.forUser(player.userId(), view));
         }
     }
 
@@ -854,9 +849,9 @@ public class GameController {
         }
         Screen screen = localizer.forUser(player.userId(), view);
         if (inPlace != null && inPlace.chatId() == player.userId()) {
-            messenger.show(inPlace, screen);
+            chatView.show(inPlace, screen);
         } else {
-            messenger.send(player.userId(), screen);
+            chatView.send(player.userId(), screen);
         }
     }
 
@@ -864,12 +859,12 @@ public class GameController {
      * Answers a command that could not be carried out, in the language of the player who sent it.
      */
     private void sendProblem(long groupChatId, User user, Msg problem) {
-        messenger.send(groupChatId,
+        chatView.send(groupChatId,
                 localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));
     }
 
     private void sendNoCaseHere(long groupChatId, User user) {
-        messenger.send(groupChatId,
+        chatView.send(groupChatId,
                 localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("err.no_case"))));
     }
 

@@ -12,6 +12,7 @@ import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
 import de.winona.telegrambot.view.Callbacks;
 import de.winona.telegrambot.view.GameScreens;
+import de.winona.telegrambot.view.MessageRef;
 import de.winona.telegrambot.view.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

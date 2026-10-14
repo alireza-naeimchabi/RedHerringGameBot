@@ -1,7 +1,6 @@
 package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.telegram.Click;
-import de.winona.telegrambot.telegram.Messenger;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
@@ -9,6 +8,7 @@ import de.winona.telegrambot.model.PlayerStats;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
+import de.winona.telegrambot.view.ChatView;
 import de.winona.telegrambot.view.MenuScreens;
 import de.winona.telegrambot.view.RoomSummary;
 import de.winona.telegrambot.view.Screen;
@@ -27,7 +27,7 @@ public class MenuController {
     private static final String START_JOIN_PREFIX = "join_";
     private static final String START_HOW_TO_PLAY = "how";
 
-    private final Messenger messenger;
+    private final ChatView chatView;
     private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
@@ -39,10 +39,10 @@ public class MenuController {
      */
     private final Set<Long> waitingForCode = new HashSet<>();
 
-    public MenuController(Messenger messenger, Localizer localizer, LobbyService lobbyService,
+    public MenuController(ChatView chatView, Localizer localizer, LobbyService lobbyService,
                           GameService gameService, StatsService statsService, RoomController roomController,
                           GameController gameController) {
-        this.messenger = messenger;
+        this.chatView = chatView;
         this.localizer = localizer;
         this.lobbyService = lobbyService;
         this.gameService = gameService;
@@ -63,7 +63,7 @@ public class MenuController {
             case "/start" -> onStart(argument, user);
             case "/menu", "/home" -> send(user, home(t, user));
             case "/rooms", "/room" -> send(user, MenuScreens.rooms(t, roomsOf(user.getId())));
-            case "/newgame" -> send(user, MenuScreens.createRoom(t, messenger.botUsername()));
+            case "/newgame" -> send(user, MenuScreens.createRoom(t, chatView.botUsername()));
             case "/join" -> {
                 if (argument.isBlank()) {
                     askForCode(user, null);
@@ -128,7 +128,7 @@ public class MenuController {
         switch (action) {
             case "home" -> show(click, home(t, user));
             case "rooms" -> show(click, MenuScreens.rooms(t, roomsOf(user.getId())));
-            case "create" -> show(click, MenuScreens.createRoom(t, messenger.botUsername()));
+            case "create" -> show(click, MenuScreens.createRoom(t, chatView.botUsername()));
             case "join" -> askForCode(user, click);
             case "how" -> show(click, MenuScreens.howToPlay(t, pageOf(click)));
             case "roles" -> show(click, MenuScreens.roles(t, pageOf(click)));
@@ -269,10 +269,10 @@ public class MenuController {
     // ---------------------------------------------------------------- Showing
 
     private void send(User user, Screen screen) {
-        messenger.send(user.getId(), screen);
+        chatView.send(user.getId(), screen);
     }
 
     private void show(Click click, Screen screen) {
-        messenger.show(click.message(), screen);
+        chatView.show(click.message(), screen);
     }
 }
