@@ -22,6 +22,7 @@ import org.telegram.telegrambots.meta.api.objects.message.MaybeInaccessibleMessa
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import de.winona.telegrambot.presenter.ChatUser;
+import de.winona.telegrambot.presenter.Presenter;
 
 /**
  * Entry point for everything Telegram sends. This class only decides who is responsible:
@@ -163,11 +164,12 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
                 localizer.textsFor(callback.getFrom().getId()),
                 messageOf(callback), chatTitleOf(callback), data.split(Callbacks.SEPARATOR));
         try {
-            switch (click.part(0)) {
-                case Callbacks.MENU -> menuController.onClick(click);
-                case Callbacks.ROOM -> roomController.onClick(click);
-                default -> gameController.onClick(click);
-            }
+            Presenter responsible = switch (click.part(0)) {
+                case Callbacks.MENU -> menuController;
+                case Callbacks.ROOM -> roomController;
+                default -> gameController;
+            };
+            responsible.onClick(click);
         } catch (RuntimeException e) {
             log.warn("Could not handle button '{}'.", data, e);
             click.alert("err.button_invalid");

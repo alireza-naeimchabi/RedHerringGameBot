@@ -19,18 +19,15 @@ import java.util.function.Function;
  * Everything that happens to a room before the case opens:
  * creating it, taking and leaving seats, opening the case and closing the room.
  */
-public class RoomController {
+public class RoomController extends Presenter {
 
-    private final ChatView chatView;
-    private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
     private final GameController gameController;
 
     public RoomController(ChatView chatView, Localizer localizer, LobbyService lobbyService,
                           GameService gameService, GameController gameController) {
-        this.chatView = chatView;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.gameController = gameController;
@@ -332,6 +329,7 @@ public class RoomController {
     /**
      * Handles the buttons of the room card and of the private room screen ("r:...").
      */
+    @Override
     public void onClick(Click click) {
         String action = click.part(1);
         String code = click.part(2);
@@ -431,12 +429,6 @@ public class RoomController {
         return localizer.forUser(userId, t -> GameScreens.seatTaken(t, lobby));
     }
 
-    /**
-     * Answers a command in the group, in the language of the player who sent it.
-     */
-    private void sendNotice(long groupChatId, ChatUser user, String icon, Msg message) {
-        chatView.send(groupChatId, localizer.forUser(user.getId(), t -> GameScreens.notice(t, icon, message)));
-    }
 
     private void sendNoRoomHere(long groupChatId, ChatUser user) {
         chatView.send(groupChatId, localizer.forUser(user.getId(), GameScreens::noRoomHere));

@@ -21,13 +21,11 @@ import java.util.*;
  * It reads data from the services and lets {@link MenuScreens} turn it into screens,
  * always in the language of the player it is talking to.
  */
-public class MenuController {
+public class MenuController extends Presenter{
 
     private static final String START_JOIN_PREFIX = "join_";
     private static final String START_HOW_TO_PLAY = "how";
 
-    private final ChatView chatView;
-    private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
     private final StatsService statsService;
@@ -41,8 +39,7 @@ public class MenuController {
     public MenuController(ChatView chatView, Localizer localizer, LobbyService lobbyService,
                           GameService gameService, StatsService statsService, RoomController roomController,
                           GameController gameController) {
-        this.chatView = chatView;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.statsService = statsService;
@@ -112,6 +109,7 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Buttons ("m:...")
 
+    @Override
     public void onClick(Click click) {
         if (!click.inPrivateChat()) {
             click.alert("err.dashboard_private");

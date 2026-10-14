@@ -24,20 +24,17 @@ import java.util.regex.Pattern;
  * <p>Languages: what goes to the group is written for all players of the case, what goes to
  * one player uses that player's language, see {@link Localizer}.
  */
-public class GameController {
+public class GameController extends Presenter {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
-    private final ChatView chatView;
-    private final Localizer localizer;
     private final GameService gameService;
     private final StatsService statsService;
     private final Random random = new Random();
 
     public GameController(ChatView chatView, Localizer localizer, GameService gameService,
                           StatsService statsService) {
-        this.chatView = chatView;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.gameService = gameService;
         this.statsService = statsService;
     }
@@ -88,6 +85,7 @@ public class GameController {
     /**
      * Handles every button that belongs to a running case.
      */
+    @Override
     public void onClick(Click click) {
         long groupChatId = click.longPart(1);
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
@@ -858,13 +856,11 @@ public class GameController {
      * Answers a command that could not be carried out, in the language of the player who sent it.
      */
     private void sendProblem(long groupChatId, ChatUser user, Msg problem) {
-        chatView.send(groupChatId,
-                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));
+        sendNotice(groupChatId, user, Theme.ICON_WRONG, problem);
     }
 
     private void sendNoCaseHere(long groupChatId, ChatUser user) {
-        chatView.send(groupChatId,
-                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("err.no_case"))));
+        sendNotice(groupChatId, user, Theme.ICON_ROOMS, Msg.of("err.no_case"));
     }
 
     private boolean isTestPlayer(Player player) {
