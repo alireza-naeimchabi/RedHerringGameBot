@@ -1,8 +1,9 @@
 """Renders the banner artwork of the bot.
 
-Run:  python3 make_banners.py <output-dir> [en|fa]
+Run:  python3 make_banners.py <output-dir> [en|de|fa]
 
-English banners go to src/main/resources/ui, Persian ones to src/main/resources/ui/fa.
+English banners go to src/main/resources/ui, German ones to src/main/resources/ui/de,
+Persian ones to src/main/resources/ui/fa.
 Persian needs the Vazirmatn font installed (https://github.com/rastikerdar/vazirmatn).
 """
 import asyncio
@@ -41,6 +42,24 @@ LANGUAGES = {
             "case-cold": ("COLD CASE", "The murderer escapes"),
         },
         "stamps": {"solved": "SOLVED", "unsolved": "UNSOLVED"},
+    },
+    "de": {
+        "font": "TeX Gyre Heros Cn",
+        "rtl": False,
+        "wordmark": "DECEPTION",
+        "tagline": "EIN KRIMINALSPIEL<br>VOLLER TÄUSCHUNG",
+        "tape": "TATORT &#160;&#160;&#160; POLIZEIABSPERRUNG &#160;&#160;&#160; ",
+        "titles": {
+            "home": ("DECEPTION", "MORD IN HONGKONG"),
+            "rooms": ("SPIELRÄUME", "Nimm Platz. Der Fall wartet."),
+            "briefing": ("SPIELANLEITUNG", "Handbuch für neue Ermittler"),
+            "roles": ("SPIELROLLEN", "Einer von euch lügt"),
+            "records": ("BILANZ", "Statistik, Rangliste und Profil"),
+            "case-open": ("FALL ERÖFFNET", "Die Ermittlung beginnt"),
+            "case-solved": ("FALL GELÖST", "Die Ermittler gewinnen"),
+            "case-cold": ("FALL UNGEKLÄRT", "Der Mörder entkommt"),
+        },
+        "stamps": {"solved": "GELÖST", "unsolved": "UNGELÖST"},
     },
     "fa": {
         "font": "Vazirmatn",

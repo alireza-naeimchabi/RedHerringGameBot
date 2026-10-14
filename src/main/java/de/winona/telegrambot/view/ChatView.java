@@ -31,4 +31,9 @@ public interface ChatView {
      * Used for small animations, for example while the lab analyses a card.
      */
     Optional<MessageRef> animate(MessageRef target, List<Screen> frames);
+
+    /**
+     * Sends Telegram's rolling dice animation and lets it roll before the next message.
+     */
+    void sendDice(long chatId);
 }
