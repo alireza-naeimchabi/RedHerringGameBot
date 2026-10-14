@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.telegram.telegrambots.meta.api.methods.pinnedmessages.PinChatMessage;
 
 /**
  * A stand-in for Telegram. It remembers every message the bot shows, lets a test press buttons,
@@ -74,6 +75,7 @@ public class FakeTelegram {
     private final Map<String, Shown> messages = new LinkedHashMap<>();
     private final Set<Long> blockedChats = new HashSet<>();
     private final List<String> problems = new ArrayList<>();
+    private final Set<String> pinned = new HashSet<>();
     private final TelegramClient client;
     private int nextMessageId = 100;
     private int nextCallbackId = 1;
@@ -183,6 +185,10 @@ public class FakeTelegram {
                 problems.add("A button press was answered twice.");
             }
             lastAnswer = new Answer(answer.getText(), Boolean.TRUE.equals(answer.getShowAlert()), answer.getUrl());
+            return true;
+        }
+        if (method instanceof PinChatMessage pin) {
+            pinned.add(key(Long.parseLong(pin.getChatId()), pin.getMessageId()));
             return true;
         }
         return true; // SetMyCommands and other calls that need no simulation
@@ -356,6 +362,10 @@ public class FakeTelegram {
             }
         }
         return Optional.empty();
+    }
+
+    public boolean isPinned(Shown shown) {
+        return pinned.contains(key(shown.chatId, shown.messageId));
     }
 
     private static String key(long chatId, int messageId) {
