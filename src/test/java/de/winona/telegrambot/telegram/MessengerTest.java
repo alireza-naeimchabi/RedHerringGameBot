@@ -4,19 +4,22 @@ import de.winona.telegrambot.telegram.FakeTelegram.Shown;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.view.Banner;
+import de.winona.telegrambot.view.Button;
+import de.winona.telegrambot.view.ButtonGrid;
 import de.winona.telegrambot.view.ChatView;
+import de.winona.telegrambot.view.Keyboard;
 import de.winona.telegrambot.view.Screen;
 import org.junit.jupiter.api.Test;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * How screens in one or two languages reach a chat.
+ * The screens use the View's own buttons; what arrives at (fake) Telegram are Telegram's buttons.
  */
 class MessengerTest {
 
@@ -79,11 +82,14 @@ class MessengerTest {
         assertEquals(List.of(), telegram.problems());
     }
 
-    private InlineKeyboardMarkup keyboard(String... labels) {
-        InlineKeyboardRow row = new InlineKeyboardRow();
+    /**
+     * One row of buttons, built the way the screens build them: with the View's own types.
+     */
+    private ButtonGrid keyboard(String... labels) {
+        List<Button> row = new ArrayList<>();
         for (int i = 0; i < labels.length; i++) {
-            row.add(InlineKeyboardButton.builder().text(labels[i]).callbackData("action" + i).build());
+            row.add(Keyboard.button(labels[i], "action" + i));
         }
-        return InlineKeyboardMarkup.builder().keyboardRow(row).build();
+        return Keyboard.create().row(row.toArray(Button[]::new)).build();
     }
 }

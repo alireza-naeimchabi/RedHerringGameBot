@@ -4,8 +4,8 @@ import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,7 +76,7 @@ public final class GameScreens {
         };
     }
 
-    private static InlineKeyboardMarkup newRoomKeyboard(Texts t) {
+    private static ButtonGrid newRoomKeyboard(Texts t) {
         return Keyboard.create()
                 .row(button(Theme.ICON_CREATE + " " + t.get("btn.create_room"), Callbacks.newRoomHere()))
                 .build();
@@ -235,7 +235,7 @@ public final class GameScreens {
                 bold(t.card(game.getKeyEvidence()))) + "\n\n"
                 + t.get("frame.who.body");
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         List<Player> others = game.getPossibleScapegoats();
         for (int i = 0; i < others.size(); i++) {
             buttons.add(button(name(t, others.get(i)), Callbacks.game(Callbacks.FRAME_PLAYER, chatId, i)));
@@ -339,7 +339,7 @@ public final class GameScreens {
         text.append(hintLines(t, game.getHints())).append("\n");
         text.append(t.get("newtile.ask")).append(" ").append(italic(t.get("newtile.tip")));
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         List<HintTile> offered = game.getOfferedTiles();
         for (int i = 0; i < offered.size(); i++) {
             buttons.add(button(subjectIcon(offered.get(i).subject()) + " " + t.tile(offered.get(i).title()),
@@ -358,7 +358,7 @@ public final class GameScreens {
                 .append("\n\n");
         text.append(t.get("replace.ask")).append(" ").append(italic(t.get("replace.fixed")));
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         List<Hint> hints = game.getHints();
         for (int i = GameState.FIXED_TILES; i < hints.size(); i++) {
             buttons.add(button(subjectIcon(hints.get(i).subject()) + " " + t.tile(hints.get(i).title())
@@ -418,7 +418,7 @@ public final class GameScreens {
                 .build());
     }
 
-    private static InlineKeyboardButton nextRoundButton(Texts t, GameState game, long chatId) {
+    private static Button nextRoundButton(Texts t, GameState game, long chatId) {
         return button(game.isLastRound() ? "⏹ " + t.get("btn.close_case") : "⏭ " + t.get("btn.next_round"),
                 Callbacks.game(Callbacks.NEXT_ROUND, chatId));
     }
@@ -474,8 +474,8 @@ public final class GameScreens {
     /**
      * One button per option of the tile. The Forensic Scientist presses one or types their own answer.
      */
-    private static InlineKeyboardMarkup optionButtons(Texts t, HintTile tile, String prefix) {
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+    private static ButtonGrid optionButtons(Texts t, HintTile tile, String prefix) {
+        List<Button> buttons = new ArrayList<>();
         for (int i = 0; i < tile.options().size(); i++) {
             buttons.add(button(t.option(tile.options().get(i)), prefix + i));
         }
@@ -510,7 +510,7 @@ public final class GameScreens {
                 + italic(t.get("lab.step", game.getRound(), 1, 2)) + "\n\n"
                 + t.get("lab.who.ask");
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         List<Player> suspects = game.getSuspects();
         for (int i = 0; i < suspects.size(); i++) {
             buttons.add(button(name(t, suspects.get(i)),
@@ -536,7 +536,7 @@ public final class GameScreens {
 
         List<Card> cards = new ArrayList<>(hand.weapons());
         cards.addAll(hand.evidence());
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         for (int i = 0; i < cards.size(); i++) {
             Card card = cards.get(i);
             String mark = game.findLabResult(card)
@@ -576,7 +576,7 @@ public final class GameScreens {
                 + italic(t.get("common.step", 1, 3)) + "\n\n"
                 + t.get("accuse.who.ask");
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         List<Player> suspects = game.getSuspects();
         for (int i = 0; i < suspects.size(); i++) {
             if (suspects.get(i).userId() != accuser.userId()) {
@@ -625,7 +625,7 @@ public final class GameScreens {
                 .build());
     }
 
-    private static InlineKeyboardButton cancelButton(Texts t, long chatId, Player accuser) {
+    private static Button cancelButton(Texts t, long chatId, Player accuser) {
         return button(t.get("btn.cancel"), Callbacks.game(Callbacks.ACCUSE_CANCEL, chatId, accuser.userId()));
     }
 
@@ -691,7 +691,7 @@ public final class GameScreens {
                 afterCaseKeyboard(t));
     }
 
-    private static InlineKeyboardMarkup afterCaseKeyboard(Texts t) {
+    private static ButtonGrid afterCaseKeyboard(Texts t) {
         return Keyboard.create()
                 .row(button(Theme.ICON_CREATE + " " + t.get("btn.new_case"), Callbacks.newRoomHere()))
                 .build();
@@ -791,7 +791,7 @@ public final class GameScreens {
      */
     public static Screen roomLanguage(Texts t, long hostId) {
         String text = Theme.heading(Theme.ICON_LANGUAGE, t.get("roomlang.title"), t.get("roomlang.sub"));
-        List<InlineKeyboardButton> choices = new ArrayList<>();
+        List<Button> choices = new ArrayList<>();
         for (Language language : Language.values()) {
             choices.add(Keyboard.button(language.flag() + " " + language.nativeName(),
                     Callbacks.roomLanguage(language.code(), hostId)));

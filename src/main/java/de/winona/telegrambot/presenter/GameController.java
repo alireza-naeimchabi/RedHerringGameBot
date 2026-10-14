@@ -1,6 +1,5 @@
 package de.winona.telegrambot.presenter;
 
-import de.winona.telegrambot.telegram.Click;
 import de.winona.telegrambot.view.*;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
@@ -10,7 +9,7 @@ import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.StatsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.telegram.telegrambots.meta.api.objects.User;
+
 
 import java.util.*;
 import java.util.function.Function;
@@ -245,7 +244,7 @@ public class GameController {
      *
      * @return false if the text is not an answer, so the dashboard can handle it
      */
-    public boolean onPrivateText(User user, String text) {
+    public boolean onPrivateText(ChatUser user, String text) {
         Optional<Game> gameOpt = gameService.gamesOf(user.getId()).stream()
                 .filter(game -> game.getForensicScientist().userId() == user.getId())
                 .filter(Game::isWaitingForTypedAnswer)
@@ -391,7 +390,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Rounds
 
-    public void nextRoundByCommand(long groupChatId, User user) {
+    public void nextRoundByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -405,7 +404,7 @@ public class GameController {
      *
      * @return empty if it worked, otherwise the reason why not
      */
-    private Optional<Msg> nextRound(Game game, User user, MessageRef inPlace) {
+    private Optional<Msg> nextRound(Game game, ChatUser user, MessageRef inPlace) {
         Player scientist = game.getForensicScientist();
 
         // If the Forensic Scientist is a test player, anyone at the table may move the case on.
@@ -495,7 +494,7 @@ public class GameController {
         showToClicker(click, t -> GameScreens.tilesPlaced(t, game));
     }
 
-    public void showSceneReport(long groupChatId, User user) {
+    public void showSceneReport(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -506,7 +505,7 @@ public class GameController {
                 : GameScreens.sceneReport(t, game.get()));
     }
 
-    public void showEvidenceBoard(long groupChatId, User user) {
+    public void showEvidenceBoard(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -517,7 +516,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Forensic lab
 
-    public void labTestByCommand(long groupChatId, User user) {
+    public void labTestByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -526,7 +525,7 @@ public class GameController {
         startLabTest(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
-    private Optional<Msg> startLabTest(Game game, User user) {
+    private Optional<Msg> startLabTest(Game game, ChatUser user) {
         Optional<Msg> problem = whyCannotTest(game, user.getId());
         if (problem.isPresent()) {
             return problem;
@@ -636,7 +635,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Accusation
 
-    public void accuseByCommand(long groupChatId, User user) {
+    public void accuseByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -645,7 +644,7 @@ public class GameController {
         startAccusation(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
-    private Optional<Msg> startAccusation(Game game, User user) {
+    private Optional<Msg> startAccusation(Game game, ChatUser user) {
         Optional<Msg> problem = whyCannotAccuse(game, user.getId());
         if (problem.isPresent()) {
             return problem;
@@ -787,7 +786,7 @@ public class GameController {
      *
      * @return false if no case is running in this group
      */
-    public boolean abandonCase(long groupChatId, User user) {
+    public boolean abandonCase(long groupChatId, ChatUser user) {
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
         if (gameOpt.isEmpty()) {
             return false;
@@ -858,12 +857,12 @@ public class GameController {
     /**
      * Answers a command that could not be carried out, in the language of the player who sent it.
      */
-    private void sendProblem(long groupChatId, User user, Msg problem) {
+    private void sendProblem(long groupChatId, ChatUser user, Msg problem) {
         chatView.send(groupChatId,
                 localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));
     }
 
-    private void sendNoCaseHere(long groupChatId, User user) {
+    private void sendNoCaseHere(long groupChatId, ChatUser user) {
         chatView.send(groupChatId,
                 localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("err.no_case"))));
     }

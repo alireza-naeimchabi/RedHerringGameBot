@@ -29,6 +29,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.*;
+import de.winona.telegrambot.view.Button;
+import de.winona.telegrambot.view.ButtonGrid;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 /**
  * The only class that talks to Telegram. It knows how to show a {@link Screen}:
@@ -100,7 +105,7 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
                 .chatId(chatId)
                 .text(screen.html())
                 .parseMode(HTML)
-                .replyMarkup(screen.keyboard())
+                .replyMarkup(toMarkup(screen.keyboard()))
                 .build();
         try {
             Message sent = client.execute(message);
@@ -126,7 +131,7 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
                     .photo(photo)
                     .caption(screen.html().isEmpty() ? null : screen.html())
                     .parseMode(screen.html().isEmpty() ? null : HTML)
-                    .replyMarkup(screen.keyboard())
+                    .replyMarkup(toMarkup(screen.keyboard()))
                     .build());
             rememberBanner(path, sent);
             return Optional.of(new MessageRef(chatId, sent.getMessageId(), true));
@@ -142,7 +147,7 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
                 .messageId(target.messageId())
                 .text(screen.html())
                 .parseMode(HTML)
-                .replyMarkup(screen.keyboard())
+                .replyMarkup(toMarkup(screen.keyboard()))
                 .build();
         try {
             client.execute(edit);
@@ -168,7 +173,7 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
                     .chatId(target.chatId())
                     .messageId(target.messageId())
                     .media(media)
-                    .replyMarkup(screen.keyboard())
+                    .replyMarkup(toMarkup(screen.keyboard()))
                     .build());
             if (result instanceof Message edited) {
                 rememberBanner(path, edited);
@@ -372,5 +377,27 @@ public class Messenger implements de.winona.telegrambot.view.ChatView {
         return commands.stream()
                 .map(command -> new BotCommand(command, t.get(keyPrefix + command)))
                 .toList();
+    }
+
+    /**
+     * Turns the View's buttons into Telegram's. Null stays null: a message without buttons.
+     */
+    private static InlineKeyboardMarkup toMarkup(ButtonGrid grid) {
+        if (grid == null) {
+            return null;
+        }
+        List<InlineKeyboardRow> rows = new ArrayList<>();
+        for (List<Button> row : grid.getKeyboard()) {
+            InlineKeyboardRow telegramRow = new InlineKeyboardRow();
+            for (Button button : row) {
+                telegramRow.add(InlineKeyboardButton.builder()
+                        .text(button.getText())
+                        .callbackData(button.getCallbackData())
+                        .url(button.getUrl())
+                        .build());
+            }
+            rows.add(telegramRow);
+        }
+        return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 }

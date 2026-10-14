@@ -1,6 +1,5 @@
 package de.winona.telegrambot.presenter;
 
-import de.winona.telegrambot.telegram.Click;
 import de.winona.telegrambot.view.MessageRef;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
@@ -9,7 +8,6 @@ import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.view.*;
 import de.winona.telegrambot.service.RoomCodeGenerator;
-import org.telegram.telegrambots.meta.api.objects.User;
 import de.winona.telegrambot.i18n.Language;
 
 import java.util.ArrayList;
@@ -43,7 +41,7 @@ public class RoomController {
     /**
      * First step of /newgame: the host chooses the language before the room opens.
      */
-    public void askRoomLanguage(long groupChatId, User creator) {
+    public void askRoomLanguage(long groupChatId, ChatUser creator) {
         if (gameService.getGame(groupChatId).isPresent()) {
             sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
             return;
@@ -72,7 +70,7 @@ public class RoomController {
     /**
      * Opens a room in a group and posts its room card.
      */
-    public void createRoom(long groupChatId, String groupTitle, User creator) {
+    public void createRoom(long groupChatId, String groupTitle, ChatUser creator) {
         if (gameService.getGame(groupChatId).isPresent()) {
             sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
             return;
@@ -95,7 +93,7 @@ public class RoomController {
     /**
      * Posts the room card again, for example after the chat has moved on.
      */
-    public void showRoomCard(long groupChatId, User user) {
+    public void showRoomCard(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isPresent()) {
             postRoomCard(lobby.get());
@@ -149,7 +147,7 @@ public class RoomController {
      * @param confirmInPrivate true if the player joined from the group, so the bot first has to
      *                         check that it may write to them in private
      */
-    public JoinOutcome join(String rawCode, User user, boolean confirmInPrivate) {
+    public JoinOutcome join(String rawCode, ChatUser user, boolean confirmInPrivate) {
         String code = RoomCodeGenerator.normalize(rawCode);
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(code);
         if (lobbyOpt.isEmpty()) {
@@ -190,7 +188,7 @@ public class RoomController {
     /**
      * Frees the player's seat. Returns a sentence for the player.
      */
-    public Msg leave(String code, User user) {
+    public Msg leave(String code, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobby.isEmpty()) {
             return Msg.of("err.room_gone");
@@ -210,7 +208,7 @@ public class RoomController {
      * @param forcedRole for practice cases: the role the host wants to play, otherwise null
      * @return empty if the case was opened, otherwise the reason why not
      */
-    public Optional<Msg> openCase(String code, User user, Role forcedRole) {
+    public Optional<Msg> openCase(String code, ChatUser user, Role forcedRole) {
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobbyOpt.isEmpty()) {
             return Optional.of(Msg.of("err.room_gone"));
@@ -238,7 +236,7 @@ public class RoomController {
     /**
      * Closes a room that has not started. Returns empty on success, otherwise the reason why not.
      */
-    public Optional<Msg> closeRoom(String code, User user) {
+    public Optional<Msg> closeRoom(String code, ChatUser user) {
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobbyOpt.isEmpty()) {
             return Optional.of(Msg.of("err.room_gone"));
@@ -254,7 +252,7 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Group commands
 
-    public void joinByCommand(long groupChatId, User user) {
+    public void joinByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             if (gameService.getGame(groupChatId).isPresent()) {
@@ -275,7 +273,7 @@ public class RoomController {
         }
     }
 
-    public void leaveByCommand(long groupChatId, User user) {
+    public void leaveByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
@@ -285,7 +283,7 @@ public class RoomController {
         chatView.send(groupChatId, localizer.forUser(user.getId(), t -> t.text(Theme.esc(t.get(result)))));
     }
 
-    public void openCaseByCommand(long groupChatId, User user, Role forcedRole) {
+    public void openCaseByCommand(long groupChatId, ChatUser user, Role forcedRole) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
@@ -298,7 +296,7 @@ public class RoomController {
     /**
      * /endgame while the room is still waiting: closes the room. Returns false if there is no room.
      */
-    public boolean closeRoomByCommand(long groupChatId, User user) {
+    public boolean closeRoomByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             return false;
@@ -311,7 +309,7 @@ public class RoomController {
     /**
      * Practice helper for the host: fills three seats with test players.
      */
-    public void addTestPlayers(long groupChatId, User user) {
+    public void addTestPlayers(long groupChatId, ChatUser user) {
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(groupChatId);
         if (lobbyOpt.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
@@ -436,15 +434,15 @@ public class RoomController {
     /**
      * Answers a command in the group, in the language of the player who sent it.
      */
-    private void sendNotice(long groupChatId, User user, String icon, Msg message) {
+    private void sendNotice(long groupChatId, ChatUser user, String icon, Msg message) {
         chatView.send(groupChatId, localizer.forUser(user.getId(), t -> GameScreens.notice(t, icon, message)));
     }
 
-    private void sendNoRoomHere(long groupChatId, User user) {
+    private void sendNoRoomHere(long groupChatId, ChatUser user) {
         chatView.send(groupChatId, localizer.forUser(user.getId(), GameScreens::noRoomHere));
     }
 
-    private Player toPlayer(User user) {
+    private Player toPlayer(ChatUser user) {
         return new Player(user.getId(), user.getFirstName());
     }
 }

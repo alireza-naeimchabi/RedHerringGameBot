@@ -1,6 +1,5 @@
 package de.winona.telegrambot.presenter;
 
-import de.winona.telegrambot.telegram.Click;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
@@ -13,7 +12,7 @@ import de.winona.telegrambot.view.MenuScreens;
 import de.winona.telegrambot.view.RoomSummary;
 import de.winona.telegrambot.view.Screen;
 import de.winona.telegrambot.service.RoomCodeGenerator;
-import org.telegram.telegrambots.meta.api.objects.User;
+
 
 import java.util.*;
 
@@ -56,7 +55,7 @@ public class MenuController {
     /**
      * Handles a command in the private chat. Returns false if the command is unknown.
      */
-    public boolean onCommand(String command, String argument, User user) {
+    public boolean onCommand(String command, String argument, ChatUser user) {
         waitingForCode.remove(user.getId());
         Texts t = localizer.textsFor(user.getId());
         switch (command) {
@@ -84,7 +83,7 @@ public class MenuController {
         return true;
     }
 
-    private void onStart(String parameter, User user) {
+    private void onStart(String parameter, ChatUser user) {
         Texts t = localizer.textsFor(user.getId());
         if (parameter.startsWith(START_JOIN_PREFIX)) {
             joinWithCode(user, parameter.substring(START_JOIN_PREFIX.length()), null);
@@ -98,7 +97,7 @@ public class MenuController {
     /**
      * Handles plain text in the private chat: a room code, if one is expected or it looks like one.
      */
-    public void onText(String text, User user) {
+    public void onText(String text, ChatUser user) {
         Texts t = localizer.textsFor(user.getId());
         boolean expected = waitingForCode.contains(user.getId());
         if (RoomCodeGenerator.looksLikeCode(text)) {
@@ -118,7 +117,7 @@ public class MenuController {
             click.alert("err.dashboard_private");
             return;
         }
-        User user = click.user();
+        ChatUser user = click.user();
         Texts t = click.texts();
         String action = click.part(1);
         if (!action.equals("join")) {
@@ -192,7 +191,7 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Joining with a code
 
-    private void askForCode(User user, Click click) {
+    private void askForCode(ChatUser user, Click click) {
         waitingForCode.add(user.getId());
         Screen prompt = MenuScreens.joinPrompt(localizer.textsFor(user.getId()));
         if (click == null) {
@@ -202,7 +201,7 @@ public class MenuController {
         }
     }
 
-    private void joinWithCode(User user, String rawCode, Click click) {
+    private void joinWithCode(ChatUser user, String rawCode, Click click) {
         Texts t = localizer.textsFor(user.getId());
         String code = RoomCodeGenerator.normalize(rawCode);
         JoinOutcome outcome = roomController.join(code, user, false);
@@ -229,20 +228,20 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Data for the screens
 
-    private Screen home(Texts t, User user) {
+    private Screen home(Texts t, ChatUser user) {
         return MenuScreens.home(t, user.getFirstName(), roomsOf(user.getId()), statsService.statsOf(user.getId()));
     }
 
-    private Screen statistics(Texts t, User user) {
+    private Screen statistics(Texts t, ChatUser user) {
         return MenuScreens.statistics(t, statsService.statsOf(user.getId()), statsService.rankOf(user.getId()));
     }
 
-    private Screen leaderboard(Texts t, User user) {
+    private Screen leaderboard(Texts t, ChatUser user) {
         return MenuScreens.leaderboard(t, statsService.leaderboard(MenuScreens.LEADERBOARD_SIZE),
                 user.getId(), statsService.rankOf(user.getId()));
     }
 
-    private Screen profile(Texts t, User user) {
+    private Screen profile(Texts t, ChatUser user) {
         String fullName = user.getLastName() == null || user.getLastName().isBlank()
                 ? user.getFirstName()
                 : user.getFirstName() + " " + user.getLastName();
@@ -268,7 +267,7 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Showing
 
-    private void send(User user, Screen screen) {
+    private void send(ChatUser user, Screen screen) {
         chatView.send(user.getId(), screen);
     }
 

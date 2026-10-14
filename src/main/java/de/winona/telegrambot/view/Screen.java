@@ -1,9 +1,9 @@
 package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.i18n.Language;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+
+
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * A screen only describes what to show. Sending it is the job of the Messenger.
  * Screens are created through {@link de.winona.telegrambot.i18n.Texts}, which knows the language.
  */
-public record Screen(Banner banner, Language language, String html, InlineKeyboardMarkup keyboard) {
+public record Screen(Banner banner, Language language, String html, ButtonGrid keyboard) {
 
     /**
      * Telegram's limit for the text under a photo.
@@ -63,14 +63,14 @@ public record Screen(Banner banner, Language language, String html, InlineKeyboa
         return new Screen(first.banner(), Language.DEFAULT, html, mergeKeyboards(versions));
     }
 
-    private static InlineKeyboardMarkup mergeKeyboards(List<Screen> versions) {
-        InlineKeyboardMarkup first = versions.get(0).keyboard();
+    private static ButtonGrid mergeKeyboards(List<Screen> versions) {
+        ButtonGrid first = versions.get(0).keyboard();
         if (first == null) {
             return null;
         }
-        List<List<InlineKeyboardButton>> merged = new ArrayList<>();
+        List<List<Button>> merged = new ArrayList<>();
         for (int rowIndex = 0; rowIndex < first.getKeyboard().size(); rowIndex++) {
-            List<InlineKeyboardButton> row = new ArrayList<>();
+            List<Button> row = new ArrayList<>();
             for (int column = 0; column < first.getKeyboard().get(rowIndex).size(); column++) {
                 row.add(mergeButton(versions, rowIndex, column));
             }
@@ -82,22 +82,23 @@ public record Screen(Banner banner, Language language, String html, InlineKeyboa
                 .filter(row -> row.size() > 1)
                 .flatMap(List::stream)
                 .anyMatch(button -> button.getText().length() > MAX_LABEL_LENGTH_IN_SHARED_ROW);
-        List<InlineKeyboardRow> rows = new ArrayList<>();
-        for (List<InlineKeyboardButton> row : merged) {
+        List<List<Button>> rows = new ArrayList<>();
+        for (List<Button> row : merged) {
             if (tooWide) {
-                row.forEach(button -> rows.add(new InlineKeyboardRow(button)));
+                row.forEach(button -> rows.add(List.of(button)));
             } else {
-                rows.add(new InlineKeyboardRow(row));
+                rows.add(row);
             }
         }
-        return InlineKeyboardMarkup.builder().keyboard(rows).build();
+        return new ButtonGrid(rows);
     }
 
-    private static InlineKeyboardButton mergeButton(List<Screen> versions, int row, int column) {
-        InlineKeyboardButton original = versions.get(0).keyboard().getKeyboard().get(row).get(column);
+
+    private static Button mergeButton(List<Screen> versions, int row, int column) {
+        Button original = versions.get(0).keyboard().getKeyboard().get(row).get(column);
         String label = original.getText();
         for (Screen version : versions.subList(1, versions.size())) {
-            InlineKeyboardMarkup keyboard = version.keyboard();
+            ButtonGrid keyboard = version.keyboard();
             if (keyboard == null || keyboard.getKeyboard().size() <= row
                     || keyboard.getKeyboard().get(row).size() <= column) {
                 continue;
@@ -108,11 +109,7 @@ public record Screen(Banner banner, Language language, String html, InlineKeyboa
                 label = label + LABEL_DIVIDER + other;
             }
         }
-        return InlineKeyboardButton.builder()
-                .text(label)
-                .callbackData(original.getCallbackData())
-                .url(original.getUrl())
-                .build();
+        return new Button(label, original.getCallbackData(), original.getUrl());
     }
 
     /**

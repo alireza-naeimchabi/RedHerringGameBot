@@ -1,10 +1,10 @@
-package de.winona.telegrambot.telegram;
+package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.view.ChatView;
 import de.winona.telegrambot.view.MessageRef;
-import org.telegram.telegrambots.meta.api.objects.User;
+
 
 /**
  * One press on an inline button: who pressed it, on which message, and with which data.
@@ -15,14 +15,14 @@ public class Click {
 
     private final ChatView chatView;
     private final String callbackId;
-    private final User user;
+    private final ChatUser user;
     private final Texts texts;
     private final MessageRef message;
     private final String chatTitle;
     private final String[] parts;
     private boolean answered;
 
-    public Click(ChatView chatView, String callbackId, User user, Texts texts, MessageRef message,
+    public Click(ChatView chatView, String callbackId, ChatUser user, Texts texts, MessageRef message,
                  String chatTitle, String[] parts) {
         this.chatView = chatView;
         this.callbackId = callbackId;
@@ -33,7 +33,7 @@ public class Click {
         this.parts = parts;
     }
 
-    public User user() {
+    public ChatUser user() {
         return user;
     }
 

@@ -4,7 +4,7 @@ import de.winona.telegrambot.model.Card;
 import de.winona.telegrambot.model.Role;
 import de.winona.telegrambot.view.Banner;
 import de.winona.telegrambot.view.Screen;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import de.winona.telegrambot.view.ButtonGrid;
 
 import java.util.Locale;
 
@@ -232,11 +232,11 @@ public final class Texts {
         return new Screen(null, language, direct(html), null);
     }
 
-    public Screen text(String html, InlineKeyboardMarkup keyboard) {
+    public Screen text(String html, ButtonGrid keyboard) {
         return new Screen(null, language, direct(html), keyboard);
     }
 
-    public Screen banner(Banner banner, String html, InlineKeyboardMarkup keyboard) {
+    public Screen banner(Banner banner, String html, ButtonGrid keyboard) {
         return new Screen(banner, language, direct(html), keyboard);
     }
 
