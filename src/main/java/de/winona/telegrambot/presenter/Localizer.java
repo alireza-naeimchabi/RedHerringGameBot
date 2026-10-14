@@ -1,4 +1,4 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;

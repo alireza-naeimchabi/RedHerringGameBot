@@ -2,6 +2,10 @@ package de.winona.telegrambot.bot;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.model.Role;
+import de.winona.telegrambot.presenter.GameController;
+import de.winona.telegrambot.presenter.Localizer;
+import de.winona.telegrambot.presenter.MenuController;
+import de.winona.telegrambot.presenter.RoomController;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LanguageService;
 import de.winona.telegrambot.service.LobbyService;
