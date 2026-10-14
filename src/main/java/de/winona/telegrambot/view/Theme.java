@@ -109,4 +109,10 @@ public final class Theme {
         }
         return "(" + esc(Character.toString(first)) + ")";
     }
+    /**
+     * Hidden under Telegram's spoiler animation until someone taps it.
+     */
+    public static String spoiler(String html) {
+        return "<tg-spoiler>" + html + "</tg-spoiler>";
+    }
 }

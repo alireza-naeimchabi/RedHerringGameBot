@@ -552,9 +552,10 @@ public final class GameScreens {
     }
 
     public static Screen labResult(Texts t, GameState game, LabResult result) {
-        String finding = result.trace()
+        // The finding is hidden, so the group can reveal it together with one tap.
+        String finding = Theme.spoiler(result.trace()
                 ? Theme.ICON_TRACE + " " + bold(t.get("lab.trace")) + "\n" + t.get("lab.trace.body")
-                : Theme.ICON_CLEAN + " " + bold(t.get("lab.clean")) + "\n" + t.get("lab.clean.body");
+                : Theme.ICON_CLEAN + " " + bold(t.get("lab.clean")) + "\n" + t.get("lab.clean.body"));
         return t.text(Theme.ICON_LAB + " " + bold(t.get("lab.result.title"))
                 + italic("  " + t.get("lab.result.round", result.round())) + "\n"
                 + t.get("lab.result.tested", esc(name(t, result.tester())),

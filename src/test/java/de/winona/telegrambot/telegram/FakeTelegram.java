@@ -69,8 +69,8 @@ public class FakeTelegram {
     public record Answer(String text, boolean alert, String url) {
     }
 
-    private static final Set<String> ALLOWED_TAGS = Set.of("b", "i", "s", "code", "pre", "blockquote");
-    private static final Pattern TAG = Pattern.compile("<(/?)([a-zA-Z]+)[^>]*>");
+    private static final Set<String> ALLOWED_TAGS = Set.of("b", "i", "s", "code", "pre", "blockquote", "tg-spoiler");
+    private static final Pattern TAG = Pattern.compile("<(/?)([a-zA-Z-]+)[^>]*>");
 
     private final Map<String, Shown> messages = new LinkedHashMap<>();
     private final Set<Long> blockedChats = new HashSet<>();
