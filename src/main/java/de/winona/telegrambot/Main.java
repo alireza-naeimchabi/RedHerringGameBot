@@ -1,6 +1,6 @@
 package de.winona.telegrambot;
 
-import de.winona.telegrambot.bot.RedHerringBot;
+import de.winona.telegrambot.telegram.RedHerringBot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;

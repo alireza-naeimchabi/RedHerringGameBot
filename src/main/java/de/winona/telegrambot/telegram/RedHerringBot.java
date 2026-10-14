@@ -1,14 +1,16 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.model.Role;
+import de.winona.telegrambot.presenter.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LanguageService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
-import de.winona.telegrambot.ui.Callbacks;
-import de.winona.telegrambot.ui.GameScreens;
-import de.winona.telegrambot.ui.Theme;
+import de.winona.telegrambot.view.Callbacks;
+import de.winona.telegrambot.view.GameScreens;
+import de.winona.telegrambot.view.MessageRef;
+import de.winona.telegrambot.view.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
@@ -19,6 +21,8 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.MaybeInaccessibleMessage;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import de.winona.telegrambot.presenter.ChatUser;
+import de.winona.telegrambot.presenter.Presenter;
 
 /**
  * Entry point for everything Telegram sends. This class only decides who is responsible:
@@ -77,10 +81,10 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
     // ---------------------------------------------------------------- Messages
 
     private void handleMessage(Message message) {
-        User user = message.getFrom();
-        if (user == null) {
+        if (message.getFrom() == null) {
             return;
         }
+        ChatUser user = toChatUser(message.getFrom());
         String text = message.getText().trim();
         boolean privateChat = message.getChat().isUserChat();
 
@@ -115,7 +119,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
         return !ownName.isBlank() && !ownName.equalsIgnoreCase(addressedBot);
     }
 
-    private void handleGroupCommand(String command, Message message, User user) {
+    private void handleGroupCommand(String command, Message message, ChatUser user) {
         long chatId = message.getChatId();
 
         switch (command) {
@@ -142,7 +146,7 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
         }
     }
 
-    private void endGame(long chatId, User user) {
+    private void endGame(long chatId, ChatUser user) {
         if (roomController.closeRoomByCommand(chatId, user)) {
             return;
         }
@@ -156,15 +160,16 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
 
     private void handleCallback(CallbackQuery callback) {
         String data = callback.getData() == null ? "" : callback.getData();
-        Click click = new Click(messenger, callback.getId(), callback.getFrom(),
+        Click click = new Click(messenger, callback.getId(), toChatUser(callback.getFrom()),
                 localizer.textsFor(callback.getFrom().getId()),
                 messageOf(callback), chatTitleOf(callback), data.split(Callbacks.SEPARATOR));
         try {
-            switch (click.part(0)) {
-                case Callbacks.MENU -> menuController.onClick(click);
-                case Callbacks.ROOM -> roomController.onClick(click);
-                default -> gameController.onClick(click);
-            }
+            Presenter responsible = switch (click.part(0)) {
+                case Callbacks.MENU -> menuController;
+                case Callbacks.ROOM -> roomController;
+                default -> gameController;
+            };
+            responsible.onClick(click);
         } catch (RuntimeException e) {
             log.warn("Could not handle button '{}'.", data, e);
             click.alert("err.button_invalid");
@@ -185,5 +190,12 @@ public class RedHerringBot implements LongPollingSingleThreadUpdateConsumer {
     private String chatTitleOf(CallbackQuery callback) {
         MaybeInaccessibleMessage message = callback.getMessage();
         return message == null || message.getChat() == null ? null : message.getChat().getTitle();
+    }
+
+    /**
+     * The only place where Telegram's user object becomes the presenters' own type.
+     */
+    private static ChatUser toChatUser(User user) {
+        return new ChatUser(user.getId(), user.getFirstName(), user.getLastName(), user.getUserName());
     }
 }

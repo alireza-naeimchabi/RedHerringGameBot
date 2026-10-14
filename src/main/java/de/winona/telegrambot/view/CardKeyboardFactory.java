@@ -1,10 +1,9 @@
-package de.winona.telegrambot.util;
+package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.Card;
-import de.winona.telegrambot.ui.Keyboard;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,19 +21,19 @@ public class CardKeyboardFactory {
     private CardKeyboardFactory() {
     }
 
-    public static InlineKeyboardMarkup createCardKeyboard(Texts t, List<Card> cards, String callbackPrefix) {
+    public static ButtonGrid createCardKeyboard(Texts t, List<Card> cards, String callbackPrefix) {
         return Keyboard.create().grid(cardButtons(t, cards, callbackPrefix), COLUMNS).build();
     }
 
-    public static List<InlineKeyboardButton> cardButtons(Texts t, List<Card> cards, String callbackPrefix) {
+    public static List<Button> cardButtons(Texts t, List<Card> cards, String callbackPrefix) {
         return textButtons(cards.stream().map(t::card).toList(), callbackPrefix);
     }
 
     /**
      * One button per label. The callback data is the prefix followed by the index, never the label.
      */
-    public static List<InlineKeyboardButton> textButtons(List<String> labels, String callbackPrefix) {
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+    public static List<Button> textButtons(List<String> labels, String callbackPrefix) {
+        List<Button> buttons = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
             buttons.add(Keyboard.button(labels.get(i), callbackPrefix + i));
         }

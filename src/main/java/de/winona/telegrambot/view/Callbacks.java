@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 /**
  * All callback data the buttons send, in one place.
@@ -23,7 +23,7 @@ public final class Callbacks {
     public static final String LANGUAGE = "m:lang";
     public static final String NO_ACTION = "m:noop";
 
-    // Game actions (the first part is kept short, the group chat id follows)
+    // GameState actions (the first part is kept short, the group chat id follows)
     public static final String WEAPON = "W";
     public static final String EVIDENCE = "E";
     public static final String HINT = "H";

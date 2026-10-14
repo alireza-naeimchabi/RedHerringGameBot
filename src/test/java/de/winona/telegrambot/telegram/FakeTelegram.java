@@ -1,4 +1,4 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetMe;

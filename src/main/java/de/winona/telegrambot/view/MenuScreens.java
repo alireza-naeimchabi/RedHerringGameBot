@@ -1,13 +1,13 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.model.Game;
-import de.winona.telegrambot.model.Lobby;
+import de.winona.telegrambot.model.GameState;
+import de.winona.telegrambot.model.LobbyState;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.model.PlayerStats;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.IntFunction;
 
-import static de.winona.telegrambot.ui.Keyboard.button;
-import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.Theme.*;
+import static de.winona.telegrambot.view.Keyboard.button;
+import static de.winona.telegrambot.view.Keyboard.link;
+import static de.winona.telegrambot.view.Theme.*;
 
 /**
  * The screens of the private dashboard. Every method only turns data into a {@link Screen};
@@ -66,9 +66,9 @@ public final class MenuScreens {
         }
         RoomSummary first = rooms.get(0);
         String line = first.inProgress()
-                ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), Game.MAX_ROUNDS)
+                ? Theme.ICON_LIVE + " " + t.get("home.status.case", first.code(), first.round(), GameState.MAX_ROUNDS)
                 : Theme.ICON_WAITING + " " + t.get("home.status.room", first.code(),
-                first.players().size(), Lobby.MAX_PLAYERS);
+                first.players().size(), LobbyState.MAX_PLAYERS);
         if (rooms.size() > 1) {
             line += "\n" + t.plural("home.status.more", rooms.size() - 1);
         }
@@ -80,7 +80,7 @@ public final class MenuScreens {
     /**
      * The button is written in every language, so it can be found without reading the current one.
      */
-    private static InlineKeyboardButton languageButton() {
+    private static Button languageButton() {
         StringBuilder label = new StringBuilder(Theme.ICON_LANGUAGE);
         for (Language language : Language.values()) {
             label.append(label.length() > Theme.ICON_LANGUAGE.length() ? " · " : " ")
@@ -97,7 +97,7 @@ public final class MenuScreens {
         text.append(t.get("lang.body"));
 
         Keyboard keyboard = Keyboard.create();
-        List<InlineKeyboardButton> choices = new ArrayList<>();
+        List<Button> choices = new ArrayList<>();
         for (Language language : Language.values()) {
             String mark = language == t.language() ? " ✓" : "";
             choices.add(button(language.flag() + " " + language.nativeName() + mark,
@@ -107,7 +107,7 @@ public final class MenuScreens {
         return t.banner(Banner.RECORDS, text.toString(), withNavigation(t, keyboard).build());
     }
 
-    // ---------------------------------------------------------------- Game rooms
+    // ---------------------------------------------------------------- GameState rooms
 
     public static Screen rooms(Texts t, List<RoomSummary> rooms) {
         StringBuilder text = new StringBuilder();
@@ -147,7 +147,7 @@ public final class MenuScreens {
     }
 
     private static String seatsLine(Texts t, RoomSummary room) {
-        int capacity = room.inProgress() ? room.players().size() : Lobby.MAX_PLAYERS;
+        int capacity = room.inProgress() ? room.players().size() : LobbyState.MAX_PLAYERS;
         return Theme.seats(room.players().size(), capacity) + "  "
                 + t.get("room.seats", room.players().size(), capacity);
     }
@@ -160,7 +160,7 @@ public final class MenuScreens {
         text.append(heading(Theme.ICON_ROOMS, t.get("room.title", room.code()),
                 t.plainName(room.room().groupTitle(), MAX_GROUP_TITLE_LENGTH))).append("\n\n");
         text.append(room.inProgress()
-                ? Theme.ICON_LIVE + " " + t.get("room.status.live", room.round(), Game.MAX_ROUNDS)
+                ? Theme.ICON_LIVE + " " + t.get("room.status.live", room.round(), GameState.MAX_ROUNDS)
                 : Theme.ICON_WAITING + " " + t.get("room.status.waiting")).append("\n");
         text.append(seatsLine(t, room)).append("\n\n");
         text.append(playerList(t, room.players(), room)).append("\n");
@@ -172,14 +172,14 @@ public final class MenuScreens {
                 keyboard.row(button(t.get("btn.rejoin"), Callbacks.caseFile(room.code())));
             }
         } else {
-            int missing = Math.max(0, Lobby.MIN_PLAYERS - room.players().size());
+            int missing = Math.max(0, LobbyState.MIN_PLAYERS - room.players().size());
             text.append(note(missing > 0
                     ? t.plural("room.note.missing", missing)
                     : t.get("room.note.ready")));
             if (host) {
                 keyboard.row(button("▶️ " + t.get("btn.open_case"), Callbacks.startRoom(room.code())));
             }
-            InlineKeyboardButton seat = seated
+            Button seat = seated
                     ? button(t.get("btn.leave_room"), Callbacks.leaveRoom(room.code()))
                     : button(Theme.ICON_JOIN + " " + t.get("btn.join_room"), Callbacks.joinRoom(room.code()));
             if (host) {
@@ -419,7 +419,7 @@ public final class MenuScreens {
      * Adds the navigation row that every dashboard screen ends with.
      */
     public static Keyboard withNavigation(Texts t, Keyboard keyboard) {
-        List<InlineKeyboardButton> buttons = new ArrayList<>(List.of(
+        List<Button> buttons = new ArrayList<>(List.of(
                 button(Theme.ICON_HOME + " " + t.get("nav.home"), Callbacks.HOME),
                 button(Theme.ICON_ROOMS + " " + t.get("nav.rooms"), Callbacks.ROOMS),
                 button(Theme.ICON_LEADERBOARD + " " + t.get("nav.leaders"), Callbacks.LEADERBOARD),
@@ -431,11 +431,11 @@ public final class MenuScreens {
      * Back, page number and Next. In a right-to-left language "next" lies to the left,
      * so the row and its arrows are mirrored.
      */
-    private static InlineKeyboardButton[] pager(Texts t, int page, int pages, IntFunction<String> target) {
+    private static Button[] pager(Texts t, int page, int pages, IntFunction<String> target) {
         String towardsStart = t.isRightToLeft() ? "▶" : "◀";
         String towardsEnd = t.isRightToLeft() ? "◀" : "▶";
 
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
         buttons.add(page > 1
                 ? button(towardsStart + " " + t.get("btn.back"), target.apply(page - 1))
                 : button("·", Callbacks.NO_ACTION));
@@ -449,11 +449,11 @@ public final class MenuScreens {
     /**
      * Telegram always lays buttons out from left to right. This puts the first button where reading starts.
      */
-    private static InlineKeyboardButton[] inReadingOrder(Texts t, List<InlineKeyboardButton> buttons) {
+    private static Button[] inReadingOrder(Texts t, List<Button> buttons) {
         if (t.isRightToLeft()) {
             Collections.reverse(buttons);
         }
-        return buttons.toArray(InlineKeyboardButton[]::new);
+        return buttons.toArray(Button[]::new);
     }
 
     private static int clamp(int page, int pages) {

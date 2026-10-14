@@ -10,19 +10,7 @@ import java.util.*;
  * each suspect may send one card to the <b>forensic lab</b>. The lab finds a trace on the real
  * cards and on the planted ones alike, so only the scene tiles tell the two trails apart.
  */
-public class Game {
-
-    public static final int MAX_ROUNDS = 3;
-    /**
-     * Cause of death always stays on the board.
-     */
-    public static final int FIXED_TILES = 1;
-    public static final int LAB_TESTS_PER_ROUND = 1;
-
-    /**
-     * A typed answer of the Forensic Scientist may be at most this long.
-     */
-    public static final int MAX_ANSWER_LENGTH = 60;
+public class Game implements GameState {
 
     private final Room room;
     private final boolean practice;
@@ -91,16 +79,9 @@ public class Game {
         });
     }
 
-    private Role roleForIndex(int index) {
-        return switch (index) {
-            case 0 -> Role.FORENSIC_SCIENTIST;
-            case 1 -> Role.MURDERER;
-            default -> Role.INVESTIGATOR;
-        };
-    }
-
     // ---------------------------------------------------------------- Players and roles
 
+    @Override
     public Room getRoom() {
         return room;
     }
@@ -108,53 +89,54 @@ public class Game {
     /**
      * A practice case uses test players or a forced role and does not count for statistics.
      */
+    @Override
     public boolean isPractice() {
         return practice;
     }
 
+    @Override
     public Map<Player, Role> getRoles() {
         return Collections.unmodifiableMap(roles);
     }
 
+    @Override
     public Map<Player, Hand> getHands() {
         return Collections.unmodifiableMap(hands);
     }
 
+    @Override
     public Player getMurderer() {
         return findPlayer(Role.MURDERER);
     }
 
+    @Override
     public Player getForensicScientist() {
         return findPlayer(Role.FORENSIC_SCIENTIST);
-    }
-
-    private Player findPlayer(Role role) {
-        return roles.entrySet().stream()
-                .filter(entry -> entry.getValue() == role)
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElseThrow();
     }
 
     /**
      * Everyone who has cards: the murderer and the investigators.
      */
+    @Override
     public List<Player> getSuspects() {
         return new ArrayList<>(hands.keySet());
     }
 
+    @Override
     public Optional<Player> getPlayer(long userId) {
         return roles.keySet().stream()
                 .filter(player -> player.userId() == userId)
                 .findFirst();
     }
 
+    @Override
     public Optional<Role> getRole(long userId) {
         return getPlayer(userId).map(roles::get);
     }
 
     // ---------------------------------------------------------------- The crime
 
+    @Override
     public Hand getMurdererHand() {
         return hands.get(getMurderer());
     }
@@ -167,6 +149,7 @@ public class Game {
         keyEvidence = getMurdererHand().evidence().get(index);
     }
 
+    @Override
     public boolean hasWeapon() {
         return murderWeapon != null;
     }
@@ -174,14 +157,17 @@ public class Game {
     /**
      * True once the murderer has chosen the Means of Murder and the Key Evidence.
      */
+    @Override
     public boolean hasSolution() {
         return murderWeapon != null && keyEvidence != null;
     }
 
+    @Override
     public Card getMurderWeapon() {
         return murderWeapon;
     }
 
+    @Override
     public Card getKeyEvidence() {
         return keyEvidence;
     }
@@ -191,6 +177,7 @@ public class Game {
     /**
      * The players the murderer can frame: every suspect except the murderer.
      */
+    @Override
     public List<Player> getPossibleScapegoats() {
         List<Player> others = getSuspects();
         others.remove(getMurderer());
@@ -201,14 +188,17 @@ public class Game {
         scapegoat = getPossibleScapegoats().get(index);
     }
 
+    @Override
     public boolean hasScapegoat() {
         return scapegoat != null;
     }
 
+    @Override
     public Player getScapegoat() {
         return scapegoat;
     }
 
+    @Override
     public Hand getScapegoatHand() {
         return hands.get(scapegoat);
     }
@@ -221,14 +211,17 @@ public class Game {
         plantedClue = getScapegoatHand().evidence().get(index);
     }
 
+    @Override
     public boolean hasPlantedMeans() {
         return plantedMeans != null;
     }
 
+    @Override
     public Card getPlantedMeans() {
         return plantedMeans;
     }
 
+    @Override
     public Card getPlantedClue() {
         return plantedClue;
     }
@@ -236,12 +229,14 @@ public class Game {
     /**
      * True once the solution is chosen and the red herring is planted. Only then the case can move on.
      */
+    @Override
     public boolean isCrimeSealed() {
         return hasSolution() && scapegoat != null && plantedMeans != null && plantedClue != null;
     }
 
     // ---------------------------------------------------------------- Scene tiles
 
+    @Override
     public Optional<HintTile> getCurrentHintTile() {
         if (allHintsGiven()) {
             return Optional.empty();
@@ -249,6 +244,7 @@ public class Game {
         return Optional.of(hintTiles.get(hints.size()));
     }
 
+    @Override
     public int getCurrentHintIndex() {
         return hints.size();
     }
@@ -258,24 +254,29 @@ public class Game {
         hints.add(new Hint(tile.title(), tile.options().get(optionIndex), tile.subject()));
     }
 
+    @Override
     public int getTileCount() {
         return hintTiles.size();
     }
 
+    @Override
     public boolean allHintsGiven() {
         return hints.size() >= hintTiles.size();
     }
 
+    @Override
     public List<Hint> getHints() {
         return Collections.unmodifiableList(hints);
     }
 
     // ---------------------------------------------------------------- Rounds
 
+    @Override
     public int getRound() {
         return round;
     }
 
+    @Override
     public boolean isLastRound() {
         return round >= MAX_ROUNDS;
     }
@@ -301,8 +302,9 @@ public class Game {
     /**
      * The tiles the Forensic Scientist may choose from. Empty once one is chosen.
      */
+    @Override
     public List<HintTile> getOfferedTiles() {
-        return offeredTiles;
+        return Collections.unmodifiableList(offeredTiles);
     }
 
     public void chooseOfferedTile(int index) {
@@ -313,14 +315,17 @@ public class Game {
     /**
      * True while the Forensic Scientist still has to choose, place or answer the new tile.
      */
+    @Override
     public boolean isReplacementPending() {
         return !offeredTiles.isEmpty() || pendingTile != null;
     }
 
+    @Override
     public HintTile getPendingTile() {
         return pendingTile;
     }
 
+    @Override
     public boolean hasPendingSlot() {
         return pendingSlot != null;
     }
@@ -342,6 +347,7 @@ public class Game {
     /**
      * True while the Forensic Scientist has a scene tile open that they answer by typing.
      */
+    @Override
     public boolean isWaitingForTypedAnswer() {
         return isCrimeSealed() && (getCurrentHintTile().isPresent() || hasPendingSlot());
     }
@@ -349,6 +355,7 @@ public class Game {
     /**
      * The scene tile the Forensic Scientist answers right now.
      */
+    @Override
     public HintTile getOpenTile() {
         return hasPendingSlot() ? pendingTile : getCurrentHintTile().orElseThrow();
     }
@@ -373,14 +380,17 @@ public class Game {
     /**
      * The lab works on the cards once the scene report of the current round is complete.
      */
+    @Override
     public boolean isLabOpen() {
         return isCrimeSealed() && allHintsGiven() && !isReplacementPending();
     }
 
+    @Override
     public boolean hasTestLeft(long userId) {
         return testsInCurrentRound.getOrDefault(userId, 0) < LAB_TESTS_PER_ROUND;
     }
 
+    @Override
     public boolean canTest(long userId) {
         return getRole(userId).filter(role -> role != Role.FORENSIC_SCIENTIST).isPresent()
                 && isLabOpen()
@@ -388,6 +398,7 @@ public class Game {
                 && isTurnOf(userId);
     }
 
+    @Override
     public Optional<LabResult> findLabResult(Card card) {
         return labResults.stream().filter(result -> result.card().equals(card)).findFirst();
     }
@@ -404,11 +415,7 @@ public class Game {
         return result;
     }
 
-    private boolean leavesTrace(Card card) {
-        return card.equals(murderWeapon) || card.equals(keyEvidence)
-                || card.equals(plantedMeans) || card.equals(plantedClue);
-    }
-
+    @Override
     public List<LabResult> getLabResults() {
         return Collections.unmodifiableList(labResults);
     }
@@ -416,6 +423,7 @@ public class Game {
     /**
      * How many lab tests were used in the current round.
      */
+    @Override
     public int getTestsUsedThisRound() {
         return testsInCurrentRound.values().stream().mapToInt(Integer::intValue).sum();
     }
@@ -423,6 +431,7 @@ public class Game {
     /**
      * How many lab tests real players have per round. Test players never use the lab.
      */
+    @Override
     public int getTestsPerRound() {
         return (int) getSuspects().stream().filter(player -> player.userId() > 0).count() * LAB_TESTS_PER_ROUND;
     }
@@ -432,10 +441,12 @@ public class Game {
     /**
      * The suspects who take turns, in seat order. Test players never take a turn.
      */
+    @Override
     public List<Player> getTurnOrder() {
         return getSuspects().stream().filter(player -> player.userId() > 0).toList();
     }
 
+    @Override
     public int getTurnIndex() {
         return turnIndex;
     }
@@ -443,6 +454,7 @@ public class Game {
     /**
      * True while the suspects are taking their turns: the report is out and not everyone has had a turn.
      */
+    @Override
     public boolean isTurnPhase() {
         return isLabOpen() && turnIndex < getTurnOrder().size();
     }
@@ -450,14 +462,17 @@ public class Game {
     /**
      * True once every suspect has had a turn: now the crime can be solved or the next round started.
      */
+    @Override
     public boolean isDiscussion() {
         return isLabOpen() && turnIndex >= getTurnOrder().size();
     }
 
+    @Override
     public Optional<Player> getCurrentTurn() {
         return isTurnPhase() ? Optional.of(getTurnOrder().get(turnIndex)) : Optional.empty();
     }
 
+    @Override
     public boolean isTurnOf(long userId) {
         return getCurrentTurn().filter(player -> player.userId() == userId).isPresent();
     }
@@ -470,10 +485,12 @@ public class Game {
     }
     // ---------------------------------------------------------------- Accusations
 
+    @Override
     public boolean hasAccused(long userId) {
         return usedAccusations.contains(userId);
     }
 
+    @Override
     public boolean canAccuse(long userId) {
         Optional<Player> player = getPlayer(userId);
         return player.isPresent()
@@ -503,11 +520,33 @@ public class Game {
         return AccusationResult.WRONG;
     }
 
+    @Override
     public boolean allInvestigatorsDone() {
         return roles.entrySet().stream()
                 .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
                 .map(Map.Entry::getKey)
                 .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
                 .allMatch(player -> usedAccusations.contains(player.userId()));
+    }
+
+    private Role roleForIndex(int index) {
+        return switch (index) {
+            case 0 -> Role.FORENSIC_SCIENTIST;
+            case 1 -> Role.MURDERER;
+            default -> Role.INVESTIGATOR;
+        };
+    }
+
+    private Player findPlayer(Role role) {
+        return roles.entrySet().stream()
+                .filter(entry -> entry.getValue() == role)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private boolean leavesTrace(Card card) {
+        return card.equals(murderWeapon) || card.equals(keyEvidence)
+                || card.equals(plantedMeans) || card.equals(plantedClue);
     }
 }

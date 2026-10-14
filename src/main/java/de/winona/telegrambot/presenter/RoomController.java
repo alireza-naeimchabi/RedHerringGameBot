@@ -1,13 +1,13 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.presenter;
 
+import de.winona.telegrambot.view.MessageRef;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
-import de.winona.telegrambot.ui.*;
-import de.winona.telegrambot.util.RoomCodeGenerator;
-import org.telegram.telegrambots.meta.api.objects.User;
+import de.winona.telegrambot.view.*;
+import de.winona.telegrambot.service.RoomCodeGenerator;
 import de.winona.telegrambot.i18n.Language;
 
 import java.util.ArrayList;
@@ -19,18 +19,15 @@ import java.util.function.Function;
  * Everything that happens to a room before the case opens:
  * creating it, taking and leaving seats, opening the case and closing the room.
  */
-public class RoomController {
+public class RoomController extends Presenter {
 
-    private final Messenger messenger;
-    private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
     private final GameController gameController;
 
-    public RoomController(Messenger messenger, Localizer localizer, LobbyService lobbyService,
+    public RoomController(ChatView chatView, Localizer localizer, LobbyService lobbyService,
                           GameService gameService, GameController gameController) {
-        this.messenger = messenger;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.gameController = gameController;
@@ -41,7 +38,7 @@ public class RoomController {
     /**
      * First step of /newgame: the host chooses the language before the room opens.
      */
-    public void askRoomLanguage(long groupChatId, User creator) {
+    public void askRoomLanguage(long groupChatId, ChatUser creator) {
         if (gameService.getGame(groupChatId).isPresent()) {
             sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
             return;
@@ -51,7 +48,7 @@ public class RoomController {
             postRoomCard(existing.get());
             return;
         }
-        messenger.send(groupChatId, GameScreens.roomLanguage(Texts.of(Language.DEFAULT), creator.getId()));
+        chatView.send(groupChatId, GameScreens.roomLanguage(Texts.of(Language.DEFAULT), creator.getId()));
     }
 
     private void chooseRoomLanguage(Click click) {
@@ -64,13 +61,13 @@ public class RoomController {
             return;
         }
         localizer.setLanguage(click.userId(), Language.fromCode(click.part(2)));
-        messenger.delete(click.message());
+        chatView.delete(click.message());
         createRoom(click.message().chatId(), click.chatTitle(), click.user());
     }
     /**
      * Opens a room in a group and posts its room card.
      */
-    public void createRoom(long groupChatId, String groupTitle, User creator) {
+    public void createRoom(long groupChatId, String groupTitle, ChatUser creator) {
         if (gameService.getGame(groupChatId).isPresent()) {
             sendNotice(groupChatId, creator, Theme.ICON_LIVE, Msg.of("group.case_running"));
             return;
@@ -84,7 +81,7 @@ public class RoomController {
         Player host = toPlayer(creator);
         Lobby lobby = lobbyService.createLobby(groupChatId, groupTitle, host).orElseThrow();
         // The host is seated right away if the bot is allowed to write to them in private.
-        if (messenger.send(host.userId(), seatConfirmation(host.userId(), lobby)).isPresent()) {
+        if (chatView.send(host.userId(), seatConfirmation(host.userId(), lobby)).isPresent()) {
             lobby.addPlayer(host);
         }
         postRoomCard(lobby);
@@ -93,7 +90,7 @@ public class RoomController {
     /**
      * Posts the room card again, for example after the chat has moved on.
      */
-    public void showRoomCard(long groupChatId, User user) {
+    public void showRoomCard(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isPresent()) {
             postRoomCard(lobby.get());
@@ -107,9 +104,9 @@ public class RoomController {
     private void postRoomCard(Lobby lobby) {
         long chatId = lobby.getRoom().groupChatId();
         if (lobby.getCardMessageId() != null) {
-            messenger.delete(new MessageRef(chatId, lobby.getCardMessageId(), false));
+            chatView.delete(new MessageRef(chatId, lobby.getCardMessageId(), false));
         }
-        Integer messageId = messenger.send(chatId, roomCard(lobby))
+        Integer messageId = chatView.send(chatId, roomCard(lobby))
                 .map(MessageRef::messageId)
                 .orElse(null);
         lobby.setCardMessageId(messageId);
@@ -124,7 +121,7 @@ public class RoomController {
             return;
         }
         MessageRef card = new MessageRef(lobby.getRoom().groupChatId(), lobby.getCardMessageId(), false);
-        Integer messageId = messenger.show(card, roomCard(lobby))
+        Integer messageId = chatView.show(card, roomCard(lobby))
                 .map(MessageRef::messageId)
                 .orElse(null);
         lobby.setCardMessageId(messageId);
@@ -133,9 +130,9 @@ public class RoomController {
     private void replaceRoomCard(Lobby lobby, RoomEnd reason) {
         Screen ended = forRoom(lobby, t -> GameScreens.roomEnded(t, lobby.getRoom().code(), reason));
         if (lobby.getCardMessageId() == null) {
-            messenger.send(lobby.getRoom().groupChatId(), ended);
+            chatView.send(lobby.getRoom().groupChatId(), ended);
         } else {
-            messenger.show(new MessageRef(lobby.getRoom().groupChatId(), lobby.getCardMessageId(), false), ended);
+            chatView.show(new MessageRef(lobby.getRoom().groupChatId(), lobby.getCardMessageId(), false), ended);
         }
     }
 
@@ -147,7 +144,7 @@ public class RoomController {
      * @param confirmInPrivate true if the player joined from the group, so the bot first has to
      *                         check that it may write to them in private
      */
-    public JoinOutcome join(String rawCode, User user, boolean confirmInPrivate) {
+    public JoinOutcome join(String rawCode, ChatUser user, boolean confirmInPrivate) {
         String code = RoomCodeGenerator.normalize(rawCode);
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(code);
         if (lobbyOpt.isEmpty()) {
@@ -163,7 +160,7 @@ public class RoomController {
         }
         // Everyone in a room plays in the host's language, so group messages stay in one language.
         localizer.setLanguage(user.getId(), localizer.languageOf(lobby.getRoom().host().userId()));
-        if (confirmInPrivate && messenger.send(user.getId(), seatConfirmation(user.getId(), lobby)).isEmpty()) {
+        if (confirmInPrivate && chatView.send(user.getId(), seatConfirmation(user.getId(), lobby)).isEmpty()) {
             return JoinOutcome.NEEDS_PRIVATE_CHAT;
         }
 
@@ -188,7 +185,7 @@ public class RoomController {
     /**
      * Frees the player's seat. Returns a sentence for the player.
      */
-    public Msg leave(String code, User user) {
+    public Msg leave(String code, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobby.isEmpty()) {
             return Msg.of("err.room_gone");
@@ -208,7 +205,7 @@ public class RoomController {
      * @param forcedRole for practice cases: the role the host wants to play, otherwise null
      * @return empty if the case was opened, otherwise the reason why not
      */
-    public Optional<Msg> openCase(String code, User user, Role forcedRole) {
+    public Optional<Msg> openCase(String code, ChatUser user, Role forcedRole) {
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobbyOpt.isEmpty()) {
             return Optional.of(Msg.of("err.room_gone"));
@@ -236,7 +233,7 @@ public class RoomController {
     /**
      * Closes a room that has not started. Returns empty on success, otherwise the reason why not.
      */
-    public Optional<Msg> closeRoom(String code, User user) {
+    public Optional<Msg> closeRoom(String code, ChatUser user) {
         Optional<Lobby> lobbyOpt = lobbyService.findByCode(RoomCodeGenerator.normalize(code));
         if (lobbyOpt.isEmpty()) {
             return Optional.of(Msg.of("err.room_gone"));
@@ -252,7 +249,7 @@ public class RoomController {
 
     // ---------------------------------------------------------------- Group commands
 
-    public void joinByCommand(long groupChatId, User user) {
+    public void joinByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             if (gameService.getGame(groupChatId).isPresent()) {
@@ -265,25 +262,25 @@ public class RoomController {
         String code = lobby.get().getRoom().code();
         JoinOutcome outcome = join(code, user, true);
         if (outcome == JoinOutcome.NEEDS_PRIVATE_CHAT) {
-            String deepLink = messenger.deepLink("join_" + code).orElse(null);
-            messenger.send(groupChatId, localizer.forUser(user.getId(),
+            String deepLink = chatView.deepLink("join_" + code).orElse(null);
+            chatView.send(groupChatId, localizer.forUser(user.getId(),
                     t -> GameScreens.needsPrivateChat(t, user.getFirstName(), deepLink)));
         } else if (!outcome.seated()) {
             sendNotice(groupChatId, user, Theme.ICON_WRONG, outcome.message(code));
         }
     }
 
-    public void leaveByCommand(long groupChatId, User user) {
+    public void leaveByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
             return;
         }
         Msg result = leave(lobby.get().getRoom().code(), user);
-        messenger.send(groupChatId, localizer.forUser(user.getId(), t -> t.text(Theme.esc(t.get(result)))));
+        chatView.send(groupChatId, localizer.forUser(user.getId(), t -> t.text(Theme.esc(t.get(result)))));
     }
 
-    public void openCaseByCommand(long groupChatId, User user, Role forcedRole) {
+    public void openCaseByCommand(long groupChatId, ChatUser user, Role forcedRole) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
@@ -296,7 +293,7 @@ public class RoomController {
     /**
      * /endgame while the room is still waiting: closes the room. Returns false if there is no room.
      */
-    public boolean closeRoomByCommand(long groupChatId, User user) {
+    public boolean closeRoomByCommand(long groupChatId, ChatUser user) {
         Optional<Lobby> lobby = lobbyService.getLobby(groupChatId);
         if (lobby.isEmpty()) {
             return false;
@@ -309,7 +306,7 @@ public class RoomController {
     /**
      * Practice helper for the host: fills three seats with test players.
      */
-    public void addTestPlayers(long groupChatId, User user) {
+    public void addTestPlayers(long groupChatId, ChatUser user) {
         Optional<Lobby> lobbyOpt = lobbyService.getLobby(groupChatId);
         if (lobbyOpt.isEmpty()) {
             sendNoRoomHere(groupChatId, user);
@@ -324,7 +321,7 @@ public class RoomController {
         lobby.addPlayer(new Player(-2, "Test Ben"));
         lobby.addPlayer(new Player(-3, "Test Clara"));
         refreshRoomCard(lobby);
-        messenger.send(groupChatId, localizer.forUser(user.getId(), t -> t.text(t.get("group.test_added"))));
+        chatView.send(groupChatId, localizer.forUser(user.getId(), t -> t.text(t.get("group.test_added"))));
     }
 
     // ---------------------------------------------------------------- Buttons
@@ -332,6 +329,7 @@ public class RoomController {
     /**
      * Handles the buttons of the room card and of the private room screen ("r:...").
      */
+    @Override
     public void onClick(Click click) {
         String action = click.part(1);
         String code = click.part(2);
@@ -356,7 +354,7 @@ public class RoomController {
                         click.toast("toast.case_open");
                         if (click.inPrivateChat()) {
                             gameController.caseFile(code, click.userId())
-                                    .ifPresent(screen -> messenger.show(click.message(), screen));
+                                    .ifPresent(screen -> chatView.show(click.message(), screen));
                         }
                     });
             case "close" -> closeRoom(code, click.user()).ifPresentOrElse(
@@ -364,7 +362,7 @@ public class RoomController {
                     () -> {
                         click.toast("toast.room_closed", code);
                         if (click.inPrivateChat()) {
-                            messenger.show(click.message(), MenuScreens.joinFailed(click.texts(), code,
+                            chatView.show(click.message(), MenuScreens.joinFailed(click.texts(), code,
                                     JoinOutcome.CLOSED.message(code)));
                         }
                     });
@@ -382,7 +380,7 @@ public class RoomController {
             }
             case ALREADY_SEATED -> click.toast(outcome.message(code));
             case NEEDS_PRIVATE_CHAT -> {
-                boolean opened = messenger.deepLink("join_" + code).map(click::openLink).orElse(false);
+                boolean opened = chatView.deepLink("join_" + code).map(click::openLink).orElse(false);
                 if (!opened) {
                     click.alert(outcome.message(code));
                 }
@@ -400,7 +398,7 @@ public class RoomController {
     private void expireStaleCard(Click click, String code) {
         boolean expired = lobbyService.endOf(code).filter(end -> end == RoomEnd.EXPIRED).isPresent();
         if (expired && click.message() != null && !click.inPrivateChat()) {
-            messenger.show(click.message(), GameScreens.roomEnded(click.texts(), code, RoomEnd.EXPIRED));
+            chatView.show(click.message(), GameScreens.roomEnded(click.texts(), code, RoomEnd.EXPIRED));
         }
     }
 
@@ -408,7 +406,7 @@ public class RoomController {
         if (!click.inPrivateChat()) {
             return;
         }
-        lobbyService.findByCode(code).ifPresent(lobby -> messenger.show(click.message(),
+        lobbyService.findByCode(code).ifPresent(lobby -> chatView.show(click.message(),
                 MenuScreens.roomDetails(localizer.textsFor(click.userId()), RoomSummary.of(lobby), click.userId())));
     }
 
@@ -418,7 +416,7 @@ public class RoomController {
      * The room card is one message for the whole group, so it is written for everyone in the room.
      */
     private Screen roomCard(Lobby lobby) {
-        return forRoom(lobby, t -> GameScreens.lobbyCard(t, lobby, messenger.botUsername()));
+        return forRoom(lobby, t -> GameScreens.lobbyCard(t, lobby, chatView.botUsername()));
     }
 
     private Screen forRoom(Lobby lobby, Function<Texts, Screen> view) {
@@ -431,18 +429,12 @@ public class RoomController {
         return localizer.forUser(userId, t -> GameScreens.seatTaken(t, lobby));
     }
 
-    /**
-     * Answers a command in the group, in the language of the player who sent it.
-     */
-    private void sendNotice(long groupChatId, User user, String icon, Msg message) {
-        messenger.send(groupChatId, localizer.forUser(user.getId(), t -> GameScreens.notice(t, icon, message)));
+
+    private void sendNoRoomHere(long groupChatId, ChatUser user) {
+        chatView.send(groupChatId, localizer.forUser(user.getId(), GameScreens::noRoomHere));
     }
 
-    private void sendNoRoomHere(long groupChatId, User user) {
-        messenger.send(groupChatId, localizer.forUser(user.getId(), GameScreens::noRoomHere));
-    }
-
-    private Player toPlayer(User user) {
+    private Player toPlayer(ChatUser user) {
         return new Player(user.getId(), user.getFirstName());
     }
 }

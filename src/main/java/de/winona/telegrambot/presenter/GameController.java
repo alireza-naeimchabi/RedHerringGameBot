@@ -1,18 +1,15 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.presenter;
 
+import de.winona.telegrambot.view.*;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.StatsService;
-import de.winona.telegrambot.ui.Callbacks;
-import de.winona.telegrambot.ui.GameScreens;
-import de.winona.telegrambot.ui.Screen;
-import de.winona.telegrambot.ui.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.telegram.telegrambots.meta.api.objects.User;
+
 
 import java.util.*;
 import java.util.function.Function;
@@ -27,20 +24,17 @@ import java.util.regex.Pattern;
  * <p>Languages: what goes to the group is written for all players of the case, what goes to
  * one player uses that player's language, see {@link Localizer}.
  */
-public class GameController {
+public class GameController extends Presenter {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
-    private final Messenger messenger;
-    private final Localizer localizer;
     private final GameService gameService;
     private final StatsService statsService;
     private final Random random = new Random();
 
-    public GameController(Messenger messenger, Localizer localizer, GameService gameService,
+    public GameController(ChatView chatView, Localizer localizer, GameService gameService,
                           StatsService statsService) {
-        this.messenger = messenger;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.gameService = gameService;
         this.statsService = statsService;
     }
@@ -91,6 +85,7 @@ public class GameController {
     /**
      * Handles every button that belongs to a running case.
      */
+    @Override
     public void onClick(Click click) {
         long groupChatId = click.longPart(1);
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
@@ -247,7 +242,7 @@ public class GameController {
      *
      * @return false if the text is not an answer, so the dashboard can handle it
      */
-    public boolean onPrivateText(User user, String text) {
+    public boolean onPrivateText(ChatUser user, String text) {
         Optional<Game> gameOpt = gameService.gamesOf(user.getId()).stream()
                 .filter(game -> game.getForensicScientist().userId() == user.getId())
                 .filter(Game::isWaitingForTypedAnswer)
@@ -351,9 +346,9 @@ public class GameController {
      * Publishes the scene report, pins it so it stays on top, and hands the first turn to the first suspect.
      */
     private void publishReport(Game game) {
-        messenger.send(game.getRoom().groupChatId(),
+        chatView.send(game.getRoom().groupChatId(),
                         localizer.forPlayers(game.getRoles().keySet(), t -> GameScreens.sceneReport(t, game)))
-                .ifPresent(messenger::pin);
+                .ifPresent(chatView::pin);
         announceTurn(game);
     }
 
@@ -393,7 +388,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Rounds
 
-    public void nextRoundByCommand(long groupChatId, User user) {
+    public void nextRoundByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -407,7 +402,7 @@ public class GameController {
      *
      * @return empty if it worked, otherwise the reason why not
      */
-    private Optional<Msg> nextRound(Game game, User user, MessageRef inPlace) {
+    private Optional<Msg> nextRound(Game game, ChatUser user, MessageRef inPlace) {
         Player scientist = game.getForensicScientist();
 
         // If the Forensic Scientist is a test player, anyone at the table may move the case on.
@@ -425,7 +420,7 @@ public class GameController {
         }
         if (game.isLastRound()) {
             if (inPlace != null) {
-                messenger.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
+                chatView.show(inPlace, localizer.forUser(user.getId(), GameScreens::caseClosedByScientist));
             }
             closeCase(game, false, null, Msg.of("verdict.reason.rounds", Game.MAX_ROUNDS));
             return Optional.empty();
@@ -497,7 +492,7 @@ public class GameController {
         showToClicker(click, t -> GameScreens.tilesPlaced(t, game));
     }
 
-    public void showSceneReport(long groupChatId, User user) {
+    public void showSceneReport(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -508,7 +503,7 @@ public class GameController {
                 : GameScreens.sceneReport(t, game.get()));
     }
 
-    public void showEvidenceBoard(long groupChatId, User user) {
+    public void showEvidenceBoard(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -519,7 +514,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Forensic lab
 
-    public void labTestByCommand(long groupChatId, User user) {
+    public void labTestByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -528,7 +523,7 @@ public class GameController {
         startLabTest(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
-    private Optional<Msg> startLabTest(Game game, User user) {
+    private Optional<Msg> startLabTest(Game game, ChatUser user) {
         Optional<Msg> problem = whyCannotTest(game, user.getId());
         if (problem.isPresent()) {
             return problem;
@@ -638,7 +633,7 @@ public class GameController {
 
     // ---------------------------------------------------------------- Accusation
 
-    public void accuseByCommand(long groupChatId, User user) {
+    public void accuseByCommand(long groupChatId, ChatUser user) {
         Optional<Game> game = gameService.getGame(groupChatId);
         if (game.isEmpty()) {
             sendNoCaseHere(groupChatId, user);
@@ -647,7 +642,7 @@ public class GameController {
         startAccusation(game.get(), user).ifPresent(problem -> sendProblem(groupChatId, user, problem));
     }
 
-    private Optional<Msg> startAccusation(Game game, User user) {
+    private Optional<Msg> startAccusation(Game game, ChatUser user) {
         Optional<Msg> problem = whyCannotAccuse(game, user.getId());
         if (problem.isPresent()) {
             return problem;
@@ -789,7 +784,7 @@ public class GameController {
      *
      * @return false if no case is running in this group
      */
-    public boolean abandonCase(long groupChatId, User user) {
+    public boolean abandonCase(long groupChatId, ChatUser user) {
         Optional<Game> gameOpt = gameService.getGame(groupChatId);
         if (gameOpt.isEmpty()) {
             return false;
@@ -819,26 +814,26 @@ public class GameController {
      * A new message in the group, written for all players of the case.
      */
     private void sendToGroup(Game game, Function<Texts, Screen> view) {
-        messenger.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
+        chatView.send(game.getRoom().groupChatId(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
     /**
      * Changes the group message a button belongs to, written for all players of the case.
      */
     private void showToGroup(Click click, Game game, Function<Texts, Screen> view) {
-        messenger.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
+        chatView.show(click.message(), localizer.forPlayers(game.getRoles().keySet(), view));
     }
 
     /**
      * Changes the private message a button belongs to, in the language of the player who pressed it.
      */
     private void showToClicker(Click click, Function<Texts, Screen> view) {
-        messenger.show(click.message(), view.apply(click.texts()));
+        chatView.show(click.message(), view.apply(click.texts()));
     }
 
     private void sendPrivately(Player player, Function<Texts, Screen> view) {
         if (!isTestPlayer(player)) {
-            messenger.send(player.userId(), localizer.forUser(player.userId(), view));
+            chatView.send(player.userId(), localizer.forUser(player.userId(), view));
         }
     }
 
@@ -851,23 +846,21 @@ public class GameController {
         }
         Screen screen = localizer.forUser(player.userId(), view);
         if (inPlace != null && inPlace.chatId() == player.userId()) {
-            messenger.show(inPlace, screen);
+            chatView.show(inPlace, screen);
         } else {
-            messenger.send(player.userId(), screen);
+            chatView.send(player.userId(), screen);
         }
     }
 
     /**
      * Answers a command that could not be carried out, in the language of the player who sent it.
      */
-    private void sendProblem(long groupChatId, User user, Msg problem) {
-        messenger.send(groupChatId,
-                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_WRONG, problem)));
+    private void sendProblem(long groupChatId, ChatUser user, Msg problem) {
+        sendNotice(groupChatId, user, Theme.ICON_WRONG, problem);
     }
 
-    private void sendNoCaseHere(long groupChatId, User user) {
-        messenger.send(groupChatId,
-                localizer.forUser(user.getId(), t -> GameScreens.notice(t, Theme.ICON_ROOMS, Msg.of("err.no_case"))));
+    private void sendNoCaseHere(long groupChatId, ChatUser user) {
+        sendNotice(groupChatId, user, Theme.ICON_ROOMS, Msg.of("err.no_case"));
     }
 
     private boolean isTestPlayer(Player player) {

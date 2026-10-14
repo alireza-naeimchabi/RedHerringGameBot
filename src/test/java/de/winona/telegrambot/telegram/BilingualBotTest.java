@@ -1,6 +1,6 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
-import de.winona.telegrambot.bot.FakeTelegram.Shown;
+import de.winona.telegrambot.telegram.FakeTelegram.Shown;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.Role;

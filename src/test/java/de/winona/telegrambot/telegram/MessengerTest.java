@@ -1,21 +1,25 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
-import de.winona.telegrambot.bot.FakeTelegram.Shown;
+import de.winona.telegrambot.telegram.FakeTelegram.Shown;
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.ui.Banner;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.Banner;
+import de.winona.telegrambot.view.Button;
+import de.winona.telegrambot.view.ButtonGrid;
+import de.winona.telegrambot.view.ChatView;
+import de.winona.telegrambot.view.Keyboard;
+import de.winona.telegrambot.view.Screen;
 import org.junit.jupiter.api.Test;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * How screens in one or two languages reach a chat.
+ * The screens use the View's own buttons; what arrives at (fake) Telegram are Telegram's buttons.
  */
 class MessengerTest {
 
@@ -24,12 +28,12 @@ class MessengerTest {
     private static final Texts FA = Texts.of(Language.PERSIAN);
 
     private final FakeTelegram telegram = new FakeTelegram();
-    private final Messenger messenger = new Messenger(telegram.client());
+    private final ChatView chatView = new Messenger(telegram.client());
 
     @Test
     void everyLanguageGetsItsOwnArtwork() {
-        messenger.send(CHAT, EN.banner(Banner.HOME, "Home", null));
-        messenger.send(CHAT, FA.banner(Banner.HOME, "خانه", null));
+        chatView.send(CHAT, EN.banner(Banner.HOME, "Home", null));
+        chatView.send(CHAT, FA.banner(Banner.HOME, "خانه", null));
 
         List<Shown> shown = telegram.chat(CHAT);
         assertEquals("banner-home.jpg", shown.get(0).banner);
@@ -43,7 +47,7 @@ class MessengerTest {
                 EN.banner(Banner.CASE_OPEN, "The case is open.", keyboard("🔬 Lab Test", "⚖️ Solve the Crime")),
                 FA.banner(Banner.CASE_OPEN, "پرونده باز است.", keyboard("🔬 آزمایش", "⚖️ حل پرونده"))));
 
-        messenger.send(CHAT, merged);
+        chatView.send(CHAT, merged);
 
         Shown message = telegram.last(CHAT);
         assertEquals(1, telegram.chat(CHAT).size());
@@ -65,7 +69,7 @@ class MessengerTest {
                 FA.banner(Banner.CASE_SOLVED, persian, keyboard("🗝 پرونده‌ی جدید"))));
         assertFalse(merged.fitsCaption());
 
-        messenger.send(CHAT, merged);
+        chatView.send(CHAT, merged);
 
         List<Shown> shown = telegram.chat(CHAT);
         assertEquals(2, shown.size());
@@ -78,11 +82,14 @@ class MessengerTest {
         assertEquals(List.of(), telegram.problems());
     }
 
-    private InlineKeyboardMarkup keyboard(String... labels) {
-        InlineKeyboardRow row = new InlineKeyboardRow();
+    /**
+     * One row of buttons, built the way the screens build them: with the View's own types.
+     */
+    private ButtonGrid keyboard(String... labels) {
+        List<Button> row = new ArrayList<>();
         for (int i = 0; i < labels.length; i++) {
-            row.add(InlineKeyboardButton.builder().text(labels[i]).callbackData("action" + i).build());
+            row.add(Keyboard.button(labels[i], "action" + i));
         }
-        return InlineKeyboardMarkup.builder().keyboardRow(row).build();
+        return Keyboard.create().row(row.toArray(Button[]::new)).build();
     }
 }

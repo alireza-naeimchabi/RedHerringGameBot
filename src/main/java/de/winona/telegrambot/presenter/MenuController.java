@@ -1,4 +1,4 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
@@ -7,11 +7,12 @@ import de.winona.telegrambot.model.PlayerStats;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
-import de.winona.telegrambot.ui.MenuScreens;
-import de.winona.telegrambot.ui.RoomSummary;
-import de.winona.telegrambot.ui.Screen;
-import de.winona.telegrambot.util.RoomCodeGenerator;
-import org.telegram.telegrambots.meta.api.objects.User;
+import de.winona.telegrambot.view.ChatView;
+import de.winona.telegrambot.view.MenuScreens;
+import de.winona.telegrambot.view.RoomSummary;
+import de.winona.telegrambot.view.Screen;
+import de.winona.telegrambot.service.RoomCodeGenerator;
+
 
 import java.util.*;
 
@@ -20,13 +21,11 @@ import java.util.*;
  * It reads data from the services and lets {@link MenuScreens} turn it into screens,
  * always in the language of the player it is talking to.
  */
-public class MenuController {
+public class MenuController extends Presenter{
 
     private static final String START_JOIN_PREFIX = "join_";
     private static final String START_HOW_TO_PLAY = "how";
 
-    private final Messenger messenger;
-    private final Localizer localizer;
     private final LobbyService lobbyService;
     private final GameService gameService;
     private final StatsService statsService;
@@ -37,11 +36,10 @@ public class MenuController {
      */
     private final Set<Long> waitingForCode = new HashSet<>();
 
-    public MenuController(Messenger messenger, Localizer localizer, LobbyService lobbyService,
+    public MenuController(ChatView chatView, Localizer localizer, LobbyService lobbyService,
                           GameService gameService, StatsService statsService, RoomController roomController,
                           GameController gameController) {
-        this.messenger = messenger;
-        this.localizer = localizer;
+        super(chatView, localizer);
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.statsService = statsService;
@@ -54,14 +52,14 @@ public class MenuController {
     /**
      * Handles a command in the private chat. Returns false if the command is unknown.
      */
-    public boolean onCommand(String command, String argument, User user) {
+    public boolean onCommand(String command, String argument, ChatUser user) {
         waitingForCode.remove(user.getId());
         Texts t = localizer.textsFor(user.getId());
         switch (command) {
             case "/start" -> onStart(argument, user);
             case "/menu", "/home" -> send(user, home(t, user));
             case "/rooms", "/room" -> send(user, MenuScreens.rooms(t, roomsOf(user.getId())));
-            case "/newgame" -> send(user, MenuScreens.createRoom(t, messenger.botUsername()));
+            case "/newgame" -> send(user, MenuScreens.createRoom(t, chatView.botUsername()));
             case "/join" -> {
                 if (argument.isBlank()) {
                     askForCode(user, null);
@@ -82,7 +80,7 @@ public class MenuController {
         return true;
     }
 
-    private void onStart(String parameter, User user) {
+    private void onStart(String parameter, ChatUser user) {
         Texts t = localizer.textsFor(user.getId());
         if (parameter.startsWith(START_JOIN_PREFIX)) {
             joinWithCode(user, parameter.substring(START_JOIN_PREFIX.length()), null);
@@ -96,7 +94,7 @@ public class MenuController {
     /**
      * Handles plain text in the private chat: a room code, if one is expected or it looks like one.
      */
-    public void onText(String text, User user) {
+    public void onText(String text, ChatUser user) {
         Texts t = localizer.textsFor(user.getId());
         boolean expected = waitingForCode.contains(user.getId());
         if (RoomCodeGenerator.looksLikeCode(text)) {
@@ -111,12 +109,13 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Buttons ("m:...")
 
+    @Override
     public void onClick(Click click) {
         if (!click.inPrivateChat()) {
             click.alert("err.dashboard_private");
             return;
         }
-        User user = click.user();
+        ChatUser user = click.user();
         Texts t = click.texts();
         String action = click.part(1);
         if (!action.equals("join")) {
@@ -126,7 +125,7 @@ public class MenuController {
         switch (action) {
             case "home" -> show(click, home(t, user));
             case "rooms" -> show(click, MenuScreens.rooms(t, roomsOf(user.getId())));
-            case "create" -> show(click, MenuScreens.createRoom(t, messenger.botUsername()));
+            case "create" -> show(click, MenuScreens.createRoom(t, chatView.botUsername()));
             case "join" -> askForCode(user, click);
             case "how" -> show(click, MenuScreens.howToPlay(t, pageOf(click)));
             case "roles" -> show(click, MenuScreens.roles(t, pageOf(click)));
@@ -190,7 +189,7 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Joining with a code
 
-    private void askForCode(User user, Click click) {
+    private void askForCode(ChatUser user, Click click) {
         waitingForCode.add(user.getId());
         Screen prompt = MenuScreens.joinPrompt(localizer.textsFor(user.getId()));
         if (click == null) {
@@ -200,7 +199,7 @@ public class MenuController {
         }
     }
 
-    private void joinWithCode(User user, String rawCode, Click click) {
+    private void joinWithCode(ChatUser user, String rawCode, Click click) {
         Texts t = localizer.textsFor(user.getId());
         String code = RoomCodeGenerator.normalize(rawCode);
         JoinOutcome outcome = roomController.join(code, user, false);
@@ -227,20 +226,20 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Data for the screens
 
-    private Screen home(Texts t, User user) {
+    private Screen home(Texts t, ChatUser user) {
         return MenuScreens.home(t, user.getFirstName(), roomsOf(user.getId()), statsService.statsOf(user.getId()));
     }
 
-    private Screen statistics(Texts t, User user) {
+    private Screen statistics(Texts t, ChatUser user) {
         return MenuScreens.statistics(t, statsService.statsOf(user.getId()), statsService.rankOf(user.getId()));
     }
 
-    private Screen leaderboard(Texts t, User user) {
+    private Screen leaderboard(Texts t, ChatUser user) {
         return MenuScreens.leaderboard(t, statsService.leaderboard(MenuScreens.LEADERBOARD_SIZE),
                 user.getId(), statsService.rankOf(user.getId()));
     }
 
-    private Screen profile(Texts t, User user) {
+    private Screen profile(Texts t, ChatUser user) {
         String fullName = user.getLastName() == null || user.getLastName().isBlank()
                 ? user.getFirstName()
                 : user.getFirstName() + " " + user.getLastName();
@@ -266,11 +265,11 @@ public class MenuController {
 
     // ---------------------------------------------------------------- Showing
 
-    private void send(User user, Screen screen) {
-        messenger.send(user.getId(), screen);
+    private void send(ChatUser user, Screen screen) {
+        chatView.send(user.getId(), screen);
     }
 
     private void show(Click click, Screen screen) {
-        messenger.show(click.message(), screen);
+        chatView.show(click.message(), screen);
     }
 }

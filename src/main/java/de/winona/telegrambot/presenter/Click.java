@@ -1,8 +1,10 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.presenter;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
-import org.telegram.telegrambots.meta.api.objects.User;
+import de.winona.telegrambot.view.ChatView;
+import de.winona.telegrambot.view.MessageRef;
+
 
 /**
  * One press on an inline button: who pressed it, on which message, and with which data.
@@ -11,18 +13,18 @@ import org.telegram.telegrambots.meta.api.objects.User;
  */
 public class Click {
 
-    private final Messenger messenger;
+    private final ChatView chatView;
     private final String callbackId;
-    private final User user;
+    private final ChatUser user;
     private final Texts texts;
     private final MessageRef message;
     private final String chatTitle;
     private final String[] parts;
     private boolean answered;
 
-    public Click(Messenger messenger, String callbackId, User user, Texts texts, MessageRef message,
+    public Click(ChatView chatView, String callbackId, ChatUser user, Texts texts, MessageRef message,
                  String chatTitle, String[] parts) {
-        this.messenger = messenger;
+        this.chatView = chatView;
         this.callbackId = callbackId;
         this.user = user;
         this.texts = texts;
@@ -31,7 +33,7 @@ public class Click {
         this.parts = parts;
     }
 
-    public User user() {
+    public ChatUser user() {
         return user;
     }
 
@@ -105,7 +107,7 @@ public class Click {
         if (answered) {
             return false;
         }
-        answered = messenger.answerCallbackWithUrl(callbackId, url);
+        answered = chatView.answerCallbackWithUrl(callbackId, url);
         return answered;
     }
 
@@ -128,6 +130,6 @@ public class Click {
             return;
         }
         answered = true;
-        messenger.answerCallback(callbackId, text, asAlert);
+        chatView.answerCallback(callbackId, text, asAlert);
     }
 }

@@ -1,7 +1,7 @@
 package de.winona.telegrambot.i18n;
 
 import de.winona.telegrambot.model.*;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.Screen;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

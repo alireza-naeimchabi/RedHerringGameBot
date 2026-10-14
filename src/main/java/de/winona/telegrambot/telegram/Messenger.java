@@ -1,8 +1,9 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.MessageRef;
+import de.winona.telegrambot.view.Screen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -28,12 +29,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.*;
+import de.winona.telegrambot.view.Button;
+import de.winona.telegrambot.view.ButtonGrid;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 
 /**
  * The only class that talks to Telegram. It knows how to show a {@link Screen}:
  * as a photo with caption or as a text message, new or by changing an existing message.
  */
-public class Messenger {
+public class Messenger implements de.winona.telegrambot.view.ChatView {
 
     private static final Logger log = LoggerFactory.getLogger(Messenger.class);
     private static final String HTML = "HTML";
@@ -55,6 +61,7 @@ public class Messenger {
     /**
      * Sends a screen as a new message. Returns where it landed, or empty if sending failed.
      */
+    @Override
     public Optional<MessageRef> send(long chatId, Screen screen) {
         if (screen.hasBanner()) {
             if (!screen.fitsCaption()) {
@@ -75,6 +82,7 @@ public class Messenger {
      * Shows a screen in place of an existing message, so menus do not flood the chat.
      * If the message cannot be changed, the screen is sent as a new message instead.
      */
+    @Override
     public Optional<MessageRef> show(MessageRef target, Screen screen) {
         if (target == null) {
             return Optional.empty();
@@ -97,7 +105,7 @@ public class Messenger {
                 .chatId(chatId)
                 .text(screen.html())
                 .parseMode(HTML)
-                .replyMarkup(screen.keyboard())
+                .replyMarkup(toMarkup(screen.keyboard()))
                 .build();
         try {
             Message sent = client.execute(message);
@@ -123,7 +131,7 @@ public class Messenger {
                     .photo(photo)
                     .caption(screen.html().isEmpty() ? null : screen.html())
                     .parseMode(screen.html().isEmpty() ? null : HTML)
-                    .replyMarkup(screen.keyboard())
+                    .replyMarkup(toMarkup(screen.keyboard()))
                     .build());
             rememberBanner(path, sent);
             return Optional.of(new MessageRef(chatId, sent.getMessageId(), true));
@@ -139,7 +147,7 @@ public class Messenger {
                 .messageId(target.messageId())
                 .text(screen.html())
                 .parseMode(HTML)
-                .replyMarkup(screen.keyboard())
+                .replyMarkup(toMarkup(screen.keyboard()))
                 .build();
         try {
             client.execute(edit);
@@ -165,7 +173,7 @@ public class Messenger {
                     .chatId(target.chatId())
                     .messageId(target.messageId())
                     .media(media)
-                    .replyMarkup(screen.keyboard())
+                    .replyMarkup(toMarkup(screen.keyboard()))
                     .build());
             if (result instanceof Message edited) {
                 rememberBanner(path, edited);
@@ -185,6 +193,7 @@ public class Messenger {
         return false;
     }
 
+    @Override
     public void delete(MessageRef target) {
         try {
             client.execute(DeleteMessage.builder()
@@ -201,6 +210,7 @@ public class Messenger {
      * Pins a message in its chat without notifying anyone. Telegram only allows this if the bot
      * is an admin with the right to pin; otherwise nothing happens and the game goes on.
      */
+    @Override
     public void pin(MessageRef target) {
         try {
             client.execute(PinChatMessage.builder()
@@ -276,6 +286,7 @@ public class Messenger {
     /**
      * Stops the loading animation of a pressed button. The text is optional.
      */
+    @Override
     public void answerCallback(String callbackId, String text, boolean asAlert) {
         try {
             client.execute(AnswerCallbackQuery.builder()
@@ -291,6 +302,7 @@ public class Messenger {
     /**
      * Answers a pressed button by opening a link, for example the private chat with this bot.
      */
+    @Override
     public boolean answerCallbackWithUrl(String callbackId, String url) {
         try {
             client.execute(AnswerCallbackQuery.builder()
@@ -307,6 +319,7 @@ public class Messenger {
     /**
      * The bot's @username without the @, or an empty text if Telegram cannot be asked.
      */
+    @Override
     public String botUsername() {
         if (botUsername == null) {
             try {
@@ -322,6 +335,7 @@ public class Messenger {
     /**
      * Link that opens the private chat with this bot and passes a start parameter.
      */
+    @Override
     public Optional<String> deepLink(String startParameter) {
         String username = botUsername();
         return username.isBlank()
@@ -363,5 +377,27 @@ public class Messenger {
         return commands.stream()
                 .map(command -> new BotCommand(command, t.get(keyPrefix + command)))
                 .toList();
+    }
+
+    /**
+     * Turns the View's buttons into Telegram's. Null stays null: a message without buttons.
+     */
+    private static InlineKeyboardMarkup toMarkup(ButtonGrid grid) {
+        if (grid == null) {
+            return null;
+        }
+        List<InlineKeyboardRow> rows = new ArrayList<>();
+        for (List<Button> row : grid.getKeyboard()) {
+            InlineKeyboardRow telegramRow = new InlineKeyboardRow();
+            for (Button button : row) {
+                telegramRow.add(InlineKeyboardButton.builder()
+                        .text(button.getText())
+                        .callbackData(button.getCallbackData())
+                        .url(button.getUrl())
+                        .build());
+            }
+            rows.add(telegramRow);
+        }
+        return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 }

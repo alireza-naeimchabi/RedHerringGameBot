@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 import java.util.List;
 import java.util.stream.Collectors;
