@@ -7,9 +7,9 @@ import de.winona.telegrambot.model.PlayerStats;
 import de.winona.telegrambot.service.GameService;
 import de.winona.telegrambot.service.LobbyService;
 import de.winona.telegrambot.service.StatsService;
-import de.winona.telegrambot.ui.MenuScreens;
-import de.winona.telegrambot.ui.RoomSummary;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.MenuScreens;
+import de.winona.telegrambot.view.RoomSummary;
+import de.winona.telegrambot.view.Screen;
 import de.winona.telegrambot.service.RoomCodeGenerator;
 import org.telegram.telegrambots.meta.api.objects.User;
 

@@ -2,7 +2,7 @@ package de.winona.telegrambot.bot;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.Screen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;

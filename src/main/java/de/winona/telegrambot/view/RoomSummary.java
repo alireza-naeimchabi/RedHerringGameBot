@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.model.Game;
 import de.winona.telegrambot.model.Lobby;

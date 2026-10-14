@@ -2,8 +2,8 @@ package de.winona.telegrambot.i18n;
 
 import de.winona.telegrambot.model.Card;
 import de.winona.telegrambot.model.Role;
-import de.winona.telegrambot.ui.Banner;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.Banner;
+import de.winona.telegrambot.view.Screen;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import java.util.Locale;

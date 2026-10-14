@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 /**
  * All callback data the buttons send, in one place.

@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.IntFunction;
 
-import static de.winona.telegrambot.ui.Keyboard.button;
-import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.Theme.*;
+import static de.winona.telegrambot.view.Keyboard.button;
+import static de.winona.telegrambot.view.Keyboard.link;
+import static de.winona.telegrambot.view.Theme.*;
 
 /**
  * The screens of the private dashboard. Every method only turns data into a {@link Screen};

@@ -4,7 +4,7 @@ import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.Player;
 import de.winona.telegrambot.service.LanguageService;
-import de.winona.telegrambot.ui.Screen;
+import de.winona.telegrambot.view.Screen;
 
 import java.util.Collection;
 import java.util.EnumSet;

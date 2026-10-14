@@ -1,4 +1,4 @@
-package de.winona.telegrambot.ui;
+package de.winona.telegrambot.view;
 
 import de.winona.telegrambot.i18n.Language;
 import de.winona.telegrambot.i18n.Msg;
@@ -13,9 +13,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static de.winona.telegrambot.ui.Keyboard.button;
-import static de.winona.telegrambot.ui.Keyboard.link;
-import static de.winona.telegrambot.ui.Theme.*;
+import static de.winona.telegrambot.view.Keyboard.button;
+import static de.winona.telegrambot.view.Keyboard.link;
+import static de.winona.telegrambot.view.Theme.*;
 
 /**
  * The screens of a room and a running case: the room card in the group, the private role
