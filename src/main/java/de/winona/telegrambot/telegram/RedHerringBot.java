@@ -1,4 +1,4 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.model.Role;

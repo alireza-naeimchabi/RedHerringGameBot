@@ -1,6 +1,6 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
-import de.winona.telegrambot.bot.FakeTelegram.Shown;
+import de.winona.telegrambot.telegram.FakeTelegram.Shown;
 import de.winona.telegrambot.model.PlayerStats;
 import de.winona.telegrambot.service.StatsService;
 import org.junit.jupiter.api.AfterEach;

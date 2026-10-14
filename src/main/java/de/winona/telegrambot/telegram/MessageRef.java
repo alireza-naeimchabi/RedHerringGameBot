@@ -1,4 +1,4 @@
-package de.winona.telegrambot.bot;
+package de.winona.telegrambot.telegram;
 
 /**
  * Points to a message that was already sent, so it can be changed in place.

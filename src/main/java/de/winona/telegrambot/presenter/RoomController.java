@@ -1,8 +1,8 @@
 package de.winona.telegrambot.presenter;
 
-import de.winona.telegrambot.bot.Click;
-import de.winona.telegrambot.bot.MessageRef;
-import de.winona.telegrambot.bot.Messenger;
+import de.winona.telegrambot.telegram.Click;
+import de.winona.telegrambot.telegram.MessageRef;
+import de.winona.telegrambot.telegram.Messenger;
 import de.winona.telegrambot.i18n.Msg;
 import de.winona.telegrambot.i18n.Texts;
 import de.winona.telegrambot.model.*;
