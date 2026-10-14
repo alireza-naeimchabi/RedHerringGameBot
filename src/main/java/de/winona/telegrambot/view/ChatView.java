@@ -1,5 +1,6 @@
 package de.winona.telegrambot.view;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,4 +25,10 @@ public interface ChatView {
     String botUsername();
 
     Optional<String> deepLink(String startParameter);
+
+    /**
+     * Shows the frames one after another in the same message, with a short pause between them.
+     * Used for small animations, for example while the lab analyses a card.
+     */
+    Optional<MessageRef> animate(MessageRef target, List<Screen> frames);
 }
