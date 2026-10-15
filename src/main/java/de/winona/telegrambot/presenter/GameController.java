@@ -122,6 +122,8 @@ public class GameController extends Presenter {
             case Callbacks.ACCUSE_WEAPON -> onAccusationStep(click, game);
             case Callbacks.ACCUSE_EVIDENCE -> onAccusationFinished(click, game);
             case Callbacks.ACCUSE_CANCEL -> onAccusationCancelled(click, game);
+            case Callbacks.VOTE_YES -> onVote(click, game, true);
+            case Callbacks.VOTE_NO -> onVote(click, game, false);
             default -> click.alert("err.button_invalid");
         }
     }
@@ -680,6 +682,9 @@ public class GameController extends Presenter {
         if (!game.isDiscussion()) {
             return Optional.of(Msg.of("err.accuse.wait"));
         }
+        if (game.getOpenAccusation().isPresent()) {
+            return Optional.of(Msg.of("err.vote.open"));
+        }
         return Optional.empty();
     }
 
@@ -744,22 +749,75 @@ public class GameController extends Presenter {
         Card weapon = hand.weapons().get(weaponIndex);
         Card evidence = hand.evidence().get(evidenceIndex);
 
-        AccusationResult result = game.accuse(accuser.userId(), suspect, weapon, evidence);
+        VoteOutcome outcome = game.proposeAccusation(accuser.userId(), suspect, weapon, evidence);
+        afterVote(click, game, outcome);
+    }
 
-        if (result == AccusationResult.SOLVED) {
-            showToGroup(click, game,
-                    t -> GameScreens.accusationFinal(t, accuser, suspect, weapon, evidence, true));
-            closeCase(game, true, accuser, null);
-        } else if (result == AccusationResult.WRONGFUL_CONVICTION) {
-            showToGroup(click, game,
-                    t -> GameScreens.accusationOfScapegoat(t, accuser, suspect, weapon, evidence));
-            closeCase(game, false, null, Msg.of("verdict.reason.framed", suspect.name()));
-        } else if (game.allInvestigatorsDone()) {
-            showToGroup(click, game,
-                    t -> GameScreens.accusationFinal(t, accuser, suspect, weapon, evidence, false));
-            closeCase(game, false, null, Msg.of("verdict.reason.attempts"));
-        } else {
-            showToGroup(click, game, t -> GameScreens.accusationWrong(t, accuser, suspect, weapon, evidence));
+    // ---------------------------------------------------------------- The group's vote
+
+    /**
+     * A suspect votes on the open accusation. The button carries the number of the proposal,
+     * so a button of an older, already decided proposal does nothing.
+     */
+    private void onVote(Click click, Game game, boolean agrees) {
+        Optional<Accusation> open = game.getOpenAccusation();
+        if (open.isEmpty() || open.get().id() != click.intPart(2)) {
+            click.alert("err.button_invalid");
+            return;
+        }
+        boolean voter = game.getVoters().stream().anyMatch(player -> player.userId() == click.userId());
+        if (!voter) {
+            click.alert("err.vote.not_allowed");
+            return;
+        }
+        if (game.hasVoted(click.userId())) {
+            click.alert("err.vote.done");
+            return;
+        }
+        afterVote(click, game, game.vote(click.userId(), agrees));
+    }
+
+    /**
+     * Shows where the vote stands, or what follows from it: the case goes on, or it is judged.
+     */
+    private void afterVote(Click click, Game game, VoteOutcome outcome) {
+        switch (outcome) {
+            case OPEN -> {
+                Accusation accusation = game.getOpenAccusation().orElseThrow();
+                showToGroup(click, game, t -> GameScreens.accusationVote(t, game, accusation));
+            }
+            case REJECTED -> showToGroup(click, game, GameScreens::accusationRejected);
+            case APPROVED -> {
+                Accusation accusation = game.getOpenAccusation().orElseThrow();
+                judge(click, game, accusation, game.judgeAccusation());
+            }
+        }
+    }
+
+    /**
+     * The group agreed. It has only this one accusation, so the case ends either way.
+     */
+    private void judge(Click click, Game game, Accusation accusation, AccusationResult result) {
+        Player proposer = accusation.proposer();
+        Player suspect = accusation.suspect();
+        Card weapon = accusation.weapon();
+        Card evidence = accusation.evidence();
+        switch (result) {
+            case SOLVED -> {
+                showToGroup(click, game,
+                        t -> GameScreens.accusationFinal(t, proposer, suspect, weapon, evidence, true));
+                closeCase(game, true, proposer, null);
+            }
+            case WRONGFUL_CONVICTION -> {
+                showToGroup(click, game,
+                        t -> GameScreens.accusationOfScapegoat(t, proposer, suspect, weapon, evidence));
+                closeCase(game, false, null, Msg.of("verdict.reason.framed", suspect.name()));
+            }
+            case WRONG -> {
+                showToGroup(click, game,
+                        t -> GameScreens.accusationFinal(t, proposer, suspect, weapon, evidence, false));
+                closeCase(game, false, null, Msg.of("verdict.reason.wrong"));
+            }
         }
     }
 

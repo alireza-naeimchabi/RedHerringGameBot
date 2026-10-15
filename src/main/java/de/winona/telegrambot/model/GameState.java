@@ -125,5 +125,15 @@ public interface GameState {
 
     boolean canAccuse(long userId);
 
-    boolean allInvestigatorsDone();
+    List<Player> getVoters();
+
+    Optional<Accusation> getOpenAccusation();
+
+    int getYesVotes();
+
+    int getNoVotes();
+
+    boolean hasVoted(long userId);
+
+    int getVotesNeeded();
 }

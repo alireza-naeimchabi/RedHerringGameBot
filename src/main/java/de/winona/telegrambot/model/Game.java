@@ -40,7 +40,11 @@ public class Game implements GameState {
     // Lab and accusations
     private final List<LabResult> labResults = new ArrayList<>();
     private final Map<Long, Integer> testsInCurrentRound = new HashMap<>();
-    private final Set<Long> usedAccusations = new HashSet<>();
+    // The group's single accusation: proposed by one suspect, decided by a majority vote
+    private final Set<Long> proposedThisRound = new HashSet<>();
+    private final Map<Long, Boolean> votes = new LinkedHashMap<>();
+    private Accusation openAccusation;
+    private int accusationsProposed = 0;
     // Turns: after the scene report every real suspect takes one turn, in seat order
     private int turnIndex = 0;
 
@@ -288,6 +292,9 @@ public class Game implements GameState {
     public List<HintTile> startNextRound() {
         round++;
         testsInCurrentRound.clear();
+        proposedThisRound.clear();
+        openAccusation = null;
+        votes.clear();
         turnIndex = 0;
         List<HintTile> offer = new ArrayList<>(hintDeck.drawOffer());
         if (hints.stream().noneMatch(hint -> hint.subject() == TileSubject.MURDERER)) {
@@ -485,48 +492,113 @@ public class Game implements GameState {
     }
     // ---------------------------------------------------------------- Accusations
 
+    /**
+     * True if the player already proposed an accusation in this round. Everyone may propose
+     * one accusation per round, so that a rejected proposal cannot be repeated again and again.
+     */
     @Override
     public boolean hasAccused(long userId) {
-        return usedAccusations.contains(userId);
+        return proposedThisRound.contains(userId);
     }
 
+    /**
+     * Every suspect may propose an accusation once all turns of the round are taken, the murderer
+     * too, so that pressing the button gives nothing away. Only one vote runs at a time.
+     */
     @Override
     public boolean canAccuse(long userId) {
         Optional<Player> player = getPlayer(userId);
         return player.isPresent()
                 && roles.get(player.get()) != Role.FORENSIC_SCIENTIST
                 && isCrimeSealed()
-                && !usedAccusations.contains(userId)
+                && !proposedThisRound.contains(userId)
+                && openAccusation == null
                 && isDiscussion();
     }
 
     /**
-     * Judges an accusation and uses the accuser's single attempt.
-     * The murderer may accuse too, so that pressing the button gives nothing away,
-     * but their accusation is always wrong: they cannot convict the player they framed
-     * themselves, and they cannot give up the case on purpose.
+     * The suspects who vote: every real player with cards, the murderer included.
+     * Test players never vote.
      */
-    public AccusationResult accuse(long accuserId, Player suspect, Card weapon, Card evidence) {
-        usedAccusations.add(accuserId);
-        if (accuserId == getMurderer().userId()) {
-            return AccusationResult.WRONG;
-        }
-        if (suspect.equals(getMurderer()) && weapon.equals(murderWeapon) && evidence.equals(keyEvidence)) {
-            return AccusationResult.SOLVED;
-        }
-        if (suspect.equals(scapegoat) && weapon.equals(plantedMeans) && evidence.equals(plantedClue)) {
-            return AccusationResult.WRONGFUL_CONVICTION;
-        }
-        return AccusationResult.WRONG;
+    @Override
+    public List<Player> getVoters() {
+        return getTurnOrder();
     }
 
     @Override
-    public boolean allInvestigatorsDone() {
-        return roles.entrySet().stream()
-                .filter(entry -> entry.getValue() == Role.INVESTIGATOR)
-                .map(Map.Entry::getKey)
-                .filter(player -> player.userId() > 0) // Test-Spieler zählen nicht
-                .allMatch(player -> usedAccusations.contains(player.userId()));
+    public Optional<Accusation> getOpenAccusation() {
+        return Optional.ofNullable(openAccusation);
+    }
+
+    @Override
+    public int getYesVotes() {
+        return (int) votes.values().stream().filter(Boolean::booleanValue).count();
+    }
+
+    @Override
+    public int getNoVotes() {
+        return votes.size() - getYesVotes();
+    }
+
+    @Override
+    public boolean hasVoted(long userId) {
+        return votes.containsKey(userId);
+    }
+
+    /**
+     * Votes needed for a majority: more than half of the voters.
+     */
+    @Override
+    public int getVotesNeeded() {
+        return getVoters().size() / 2 + 1;
+    }
+
+    /**
+     * Opens a vote on an accusation. The one who proposes it votes for it right away.
+     */
+    public VoteOutcome proposeAccusation(long proposerId, Player suspect, Card weapon, Card evidence) {
+        Player proposer = getPlayer(proposerId).orElseThrow();
+        proposedThisRound.add(proposerId);
+        accusationsProposed++;
+        openAccusation = new Accusation(accusationsProposed, proposer, suspect, weapon, evidence);
+        votes.clear();
+        return vote(proposerId, true);
+    }
+
+    /**
+     * One vote on the open accusation. Every voter votes once.
+     */
+    public VoteOutcome vote(long voterId, boolean agrees) {
+        votes.put(voterId, agrees);
+        int voters = getVoters().size();
+        if (getYesVotes() >= getVotesNeeded()) {
+            return VoteOutcome.APPROVED;
+        }
+        if (getNoVotes() * 2 >= voters) {
+            openAccusation = null;
+            votes.clear();
+            return VoteOutcome.REJECTED;
+        }
+        return VoteOutcome.OPEN;
+    }
+
+    /**
+     * Judges the accusation the group agreed on. The group has only this one accusation:
+     * whatever the answer, the case ends with it.
+     */
+    public AccusationResult judgeAccusation() {
+        Accusation accusation = openAccusation;
+        openAccusation = null;
+        votes.clear();
+        if (accusation.suspect().equals(getMurderer()) && accusation.weapon().equals(murderWeapon)
+                && accusation.evidence().equals(keyEvidence)) {
+            return AccusationResult.SOLVED;
+        }
+        if (accusation.suspect().equals(scapegoat) && accusation.weapon().equals(plantedMeans)
+                && accusation.evidence().equals(plantedClue)) {
+            return AccusationResult.WRONGFUL_CONVICTION;
+        }
+        return AccusationResult.WRONG;
     }
 
     private Role roleForIndex(int index) {

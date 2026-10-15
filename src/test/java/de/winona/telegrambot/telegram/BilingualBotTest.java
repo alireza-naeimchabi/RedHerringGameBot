@@ -307,13 +307,17 @@ class BilingualBotTest {
         assertEquals(FA.get("err.lab.used"), telegram.lastAnswer().text());
         skipAllTurns();
 
-        // A wrong accusation: the right player and means, the wrong clue card.
+        // A wrong accusation: the right player and means, the wrong clue card. The group rejects it.
         press(second, cast.report, "AC:" + GROUP);
         Shown wrong = telegram.last(GROUP);
         press(second, wrong, wrong.button(cast.murderer.getFirstName()).orElseThrow().getCallbackData());
         press(second, wrong, wrong.buttons().get(0).getCallbackData());
         press(second, wrong, wrong.buttons().get(1).getCallbackData());
-        assertTrue(wrong.html.contains(FA.get("accuse.wrong")), wrong.html);
+        assertTrue(wrong.html.contains(FA.get("vote.title")), wrong.html);
+        String reject = wrong.buttons().get(1).getCallbackData();
+        press(first, wrong, reject);
+        press(cast.murderer, wrong, reject);
+        assertTrue(wrong.html.contains(FA.get("vote.rejected.title")), wrong.html);
         press(second, cast.report, "AC:" + GROUP);
         assertEquals(FA.get("err.accuse.used"), telegram.lastAnswer().text());
 
@@ -336,7 +340,7 @@ class BilingualBotTest {
         say(second, "/rooms");
         Shown rooms = telegram.last(second.getId());
         press(second, rooms, "m:case:" + code);
-        assertTrue(telegram.last(second.getId()).html.contains(FA.get("file.attempt.used")));
+        assertTrue(telegram.last(second.getId()).html.contains(FA.get("file.attempt.open")));
 
         skipAllTurns();
         accuseCorrectly(first, cast);
@@ -621,6 +625,15 @@ class BilingualBotTest {
         press(accuser, flow, suspect.getCallbackData());
         press(accuser, flow, flow.buttons().get(0).getCallbackData());
         press(accuser, flow, flow.buttons().get(0).getCallbackData());
+
+        // The group votes: everyone else agrees until the majority is reached.
+        for (User voter : cast.suspects) {
+            boolean voteOpen = flow.buttons().stream()
+                    .anyMatch(button -> button.getCallbackData().startsWith("VY:"));
+            if (voter != accuser && voteOpen) {
+                press(voter, flow, flow.buttons().get(0).getCallbackData());
+            }
+        }
     }
 
     /**

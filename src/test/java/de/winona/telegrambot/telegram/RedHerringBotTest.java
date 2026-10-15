@@ -345,12 +345,28 @@ class RedHerringBotTest {
         press(scientist, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
         assertTrue(telegram.lastAnswer().text().contains("Forensic Scientist cannot solve"));
 
-        // A wrong accusation costs the attempt, and other players cannot press its buttons.
-        accuse(first, report, murderer.getFirstName(), crime.means, wrongClue, second);
-        Shown wrong = telegram.find(GROUP, "has used their attempt").orElseThrow();
-        assertTrue(wrong.buttons().isEmpty());
+        // An accusation goes to a group vote, and other players cannot press its buttons before that.
+        Shown vote = accuse(first, report, murderer.getFirstName(), crime.means, wrongClue, second);
+        assertTrue(vote.html.contains("The group votes"), vote.html);
+        assertTrue(vote.html.contains("Agree: 1 · Reject: 0 · Needed: 2 of 3"), vote.html);
+        press(first, vote, vote.button("Agree").orElseThrow().getCallbackData());
+        assertEquals("You have already voted.", telegram.lastAnswer().text());
+        press(scientist, vote, vote.button("Agree").orElseThrow().getCallbackData());
+        assertTrue(telegram.lastAnswer().text().contains("Only the suspects"));
+        press(second, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
+        assertTrue(telegram.lastAnswer().text().contains("already voting"));
+
+        // Most of the group rejects it: the case goes on, but not with another proposal from the same player.
+        String voteButton = vote.button("Reject").orElseThrow().getCallbackData();
+        press(second, vote, voteButton);
+        press(murderer, vote, voteButton);
+        assertTrue(vote.html.contains("rejected the accusation"), vote.html);
+        assertTrue(vote.buttons().isEmpty());
+        press(second, vote, voteButton);
+        assertTrue(telegram.lastAnswer().alert(), "an old vote cannot be pressed again");
+        assertTrue(telegram.find(GROUP, "UNSOLVED").isEmpty(), "the case goes on");
         press(first, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
-        assertTrue(telegram.lastAnswer().text().contains("already used your attempt"));
+        assertTrue(telegram.lastAnswer().text().contains("already proposed an accusation this round"));
 
         // Round 2: the Forensic Scientist chooses one of two new tiles and replaces an old answer.
         press(scientist, tile, tile.button("Next Round").orElseThrow().getCallbackData());
@@ -393,15 +409,16 @@ class RedHerringBotTest {
         Shown caseFile = telegram.last(first.getId());
         assertTrue(caseFile.html.contains("CASE FILE " + code));
         assertTrue(caseFile.html.contains("Your role: <b>Investigator</b>"));
-        assertTrue(caseFile.html.contains("attempt to solve the crime is used"));
+        assertTrue(caseFile.html.contains("You may propose an accusation"), "a new round, a new proposal");
         assertFalse(caseFile.html.contains("Planted on"), "only the murderer sees the red herring");
         say(murderer, "/rooms");
         Shown murdererRooms = telegram.last(murderer.getId());
         press(murderer, murdererRooms, murdererRooms.button("Rejoin Game " + code).orElseThrow().getCallbackData());
         assertTrue(telegram.last(murderer.getId()).html.contains("Planted on " + crime.scapegoat));
 
-        // The correct accusation ends the case and reveals the red herring.
-        accuse(second, secondReport, murderer.getFirstName(), crime.means, crime.keyEvidence, null);
+        // The group agrees on the correct accusation: it ends the case and reveals the red herring.
+        Shown finalVote = accuse(second, secondReport, murderer.getFirstName(), crime.means, crime.keyEvidence, null);
+        press(first, finalVote, finalVote.button("Agree").orElseThrow().getCallbackData());
         Shown verdict = telegram.last(GROUP);
         assertEquals("banner-case-solved.jpg", verdict.banner);
         assertTrue(verdict.html.contains("CASE " + code + " SOLVED"));
@@ -451,7 +468,8 @@ class RedHerringBotTest {
                 .filter(user -> user != scientist && user != murderer
                         && !user.getFirstName().equals(crime.scapegoat))
                 .findFirst().orElseThrow();
-        accuse(accuser, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
+        Shown vote = accuse(accuser, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
+        press(murderer, vote, vote.button("Agree").orElseThrow().getCallbackData());
 
         assertTrue(telegram.find(GROUP, "It was a red herring.").isPresent());
         Shown verdict = telegram.last(GROUP);
@@ -464,7 +482,7 @@ class RedHerringBotTest {
     }
 
     @Test
-    void theMurdererCannotConvictTheirOwnScapegoat() {
+    void theMurdererMayProposeButTheGroupDecides() {
         openCaseWithFourPlayers();
         User scientist = playerWithRole("FORENSIC SCIENTIST");
         User murderer = playerWithRole("MURDERER");
@@ -472,19 +490,46 @@ class RedHerringBotTest {
         answerAllTiles(scientist);
         Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
         skipAllTurns();
+        List<User> investigators = table.stream()
+                .filter(user -> user != scientist && user != murderer)
+                .toList();
 
-        // The murderer knows where the red herring is, but naming it does not end the case.
-        accuse(murderer, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
-        Shown answer = telegram.last(GROUP);
-        assertTrue(answer.html.contains("No."), answer.html);
-        assertTrue(answer.html.contains(murderer.getFirstName() + " has used their attempt"), answer.html);
+        // The murderer pushes the red herring, but the investigators do not follow.
+        Shown vote = accuse(murderer, report, crime.scapegoat, crime.plantedMeans, crime.plantedClue, null);
+        for (User investigator : investigators) {
+            press(investigator, vote, vote.button("Reject").orElseThrow().getCallbackData());
+        }
+        assertTrue(vote.html.contains("rejected the accusation"), vote.html);
         assertTrue(telegram.find(GROUP, "It was a red herring.").isEmpty());
         assertTrue(telegram.find(GROUP, "UNSOLVED").isEmpty(), "the case goes on");
 
-        // An investigator can still solve it.
-        User investigator = playerWithRole("INVESTIGATOR");
-        accuse(investigator, report, murderer.getFirstName(), crime.means, crime.keyEvidence, null);
+        // An investigator proposes the truth; the murderer votes against it, but the majority wins.
+        Shown truth = accuse(investigators.get(0), report, murderer.getFirstName(), crime.means, crime.keyEvidence, null);
+        press(murderer, truth, truth.button("Reject").orElseThrow().getCallbackData());
+        assertTrue(telegram.find(GROUP, "SOLVED").isEmpty(), "one more vote is needed");
+        press(investigators.get(1), truth, truth.button("Agree").orElseThrow().getCallbackData());
         assertTrue(telegram.last(GROUP).html.contains("SOLVED"));
+    }
+
+    @Test
+    void aWrongAccusationTheGroupAgreesOnLetsTheMurdererWin() {
+        String code = openCaseWithFourPlayers();
+        User scientist = playerWithRole("FORENSIC SCIENTIST");
+        User murderer = playerWithRole("MURDERER");
+        Crime crime = commitCrime(murderer, 0, 0);
+        answerAllTiles(scientist);
+        Shown report = telegram.find(GROUP, "SCENE REPORT").orElseThrow();
+        skipAllTurns();
+
+        User investigator = playerWithRole("INVESTIGATOR");
+        String wrongClue = otherClueOf(murderer, crime.keyEvidence);
+        Shown vote = accuse(investigator, report, murderer.getFirstName(), crime.means, wrongClue, null);
+        press(murderer, vote, vote.button("Agree").orElseThrow().getCallbackData());
+
+        Shown verdict = telegram.last(GROUP);
+        assertTrue(verdict.html.contains("CASE " + code + " UNSOLVED"), verdict.html);
+        assertTrue(telegram.find(GROUP, "only accusation was wrong").isPresent());
+        assertEquals(1, stats.statsOf(murderer.getId()).orElseThrow().getEscapes());
     }
 
     @Test
@@ -765,7 +810,7 @@ class RedHerringBotTest {
     /**
      * Walks through the three accusation steps by button label.
      */
-    private void accuse(User accuser, Shown report, String suspect, String means, String clue, User intruder) {
+    private Shown accuse(User accuser, Shown report, String suspect, String means, String clue, User intruder) {
         press(accuser, report, report.button("Solve the Crime").orElseThrow().getCallbackData());
         Shown flow = telegram.last(GROUP);
         assertTrue(flow.html.contains("Who is the murderer?"));
@@ -779,6 +824,7 @@ class RedHerringBotTest {
         press(accuser, flow, flow.button(suspect).orElseThrow().getCallbackData());
         press(accuser, flow, flow.button(means).orElseThrow().getCallbackData());
         press(accuser, flow, flow.button(clue).orElseThrow().getCallbackData());
+        return flow;
     }
 
     private int countOccurrences(String text, String part) {
