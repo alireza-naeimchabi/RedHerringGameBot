@@ -6,7 +6,7 @@ public enum AccusationResult {
      */
     SOLVED,
     /**
-     * Something is wrong. The accuser has used their attempt.
+     * Something is wrong. The group has used its single accusation and the murderer wins.
      */
     WRONG,
     /**

@@ -173,44 +173,68 @@ class GameTest {
     }
 
     @Test
-    void theMurdererCanAccuseButNeverDecidesTheCase() {
+    void theGroupVotesOnOneAccusationAndAMajorityDecides() {
         Hand real = game.getMurdererHand();
-        Hand framed = game.getScapegoatHand();
-
-        assertFalse(game.canAccuse(murderer.userId()), "nobody accuses before every suspect had a turn");
+        assertFalse(game.canAccuse(bystander.userId()), "nobody accuses before every suspect had a turn");
         game.getTurnOrder().forEach(player -> game.endTurn());
         assertTrue(game.canAccuse(murderer.userId()), "the button gives nothing away");
-        assertEquals(AccusationResult.WRONG,
-                game.accuse(murderer.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3)),
-                "the murderer cannot convict the player they framed");
-        assertTrue(game.hasAccused(murderer.userId()));
-        assertFalse(game.allInvestigatorsDone(), "the murderer's attempt does not count");
-        assertEquals(AccusationResult.SOLVED,
-                game.accuse(bystander.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+
+        assertEquals(4, game.getVoters().size(), "every suspect votes, the murderer too");
+        assertEquals(3, game.getVotesNeeded());
+        assertEquals(VoteOutcome.OPEN,
+                game.proposeAccusation(bystander.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+        assertTrue(game.hasVoted(bystander.userId()), "the one who proposes votes yes");
+        assertFalse(game.canAccuse(scapegoat.userId()), "only one vote runs at a time");
+        assertEquals(VoteOutcome.OPEN, game.vote(murderer.userId(), false));
+        assertEquals(VoteOutcome.OPEN, game.vote(scapegoat.userId(), true));
+        assertEquals(2, game.getYesVotes());
+        assertEquals(1, game.getNoVotes());
+        Player last = game.getVoters().stream().filter(p -> !game.hasVoted(p.userId())).findFirst().orElseThrow();
+        assertEquals(VoteOutcome.APPROVED, game.vote(last.userId(), true));
+        assertEquals(AccusationResult.SOLVED, game.judgeAccusation());
+        assertTrue(game.getOpenAccusation().isEmpty());
     }
 
     @Test
-    void theMurdererCannotGiveUpTheCaseOnPurpose() {
-        Hand real = game.getMurdererHand();
-        assertEquals(AccusationResult.WRONG,
-                game.accuse(murderer.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
+    void aRejectedAccusationLetsTheGameGoOnButNotForTheSameProposer() {
+        Hand framed = game.getScapegoatHand();
+        game.getTurnOrder().forEach(player -> game.endTurn());
+
+        game.proposeAccusation(murderer.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3));
+        assertEquals(VoteOutcome.OPEN, game.vote(scapegoat.userId(), false));
+        assertEquals(VoteOutcome.REJECTED, game.vote(bystander.userId(), false), "half the group says no");
+        assertTrue(game.getOpenAccusation().isEmpty());
+        assertFalse(game.canAccuse(murderer.userId()), "one proposal per player and round");
+        assertTrue(game.canAccuse(bystander.userId()));
     }
 
     @Test
-    void anAccusationIsSolvedWrongOrAWrongfulConviction() {
+    void anApprovedAccusationIsSolvedWrongOrAWrongfulConviction() {
         Hand real = game.getMurdererHand();
         Hand framed = game.getScapegoatHand();
 
         assertEquals(AccusationResult.WRONG,
-                game.accuse(bystander.userId(), murderer, real.weapons().get(0), real.evidence().get(0)));
+                approved(murderer, real.weapons().get(0), real.evidence().get(0)));
         assertEquals(AccusationResult.WRONG,
-                game.accuse(bystander.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(0)),
+                approved(scapegoat, framed.weapons().get(2), framed.evidence().get(0)),
                 "one planted card is not enough for a conviction");
         assertEquals(AccusationResult.WRONGFUL_CONVICTION,
-                game.accuse(bystander.userId(), scapegoat, framed.weapons().get(2), framed.evidence().get(3)));
+                approved(scapegoat, framed.weapons().get(2), framed.evidence().get(3)));
         assertEquals(AccusationResult.SOLVED,
-                game.accuse(scapegoat.userId(), murderer, real.weapons().get(0), real.evidence().get(1)));
-        assertTrue(game.hasAccused(bystander.userId()));
-        assertFalse(game.canAccuse(bystander.userId()));
+                approved(murderer, real.weapons().get(0), real.evidence().get(1)));
+    }
+
+    /**
+     * The whole group agrees with an accusation, then the case is judged.
+     */
+    private AccusationResult approved(Player suspect, Card weapon, Card evidence) {
+        game.getTurnOrder().forEach(player -> game.endTurn());
+        List<Player> voters = game.getVoters();
+        VoteOutcome outcome = game.proposeAccusation(voters.get(0).userId(), suspect, weapon, evidence);
+        for (int i = 1; outcome == VoteOutcome.OPEN; i++) {
+            outcome = game.vote(voters.get(i).userId(), true);
+        }
+        assertEquals(VoteOutcome.APPROVED, outcome);
+        return game.judgeAccusation();
     }
 }

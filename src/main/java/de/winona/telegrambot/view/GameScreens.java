@@ -660,10 +660,27 @@ public final class GameScreens {
                 + Theme.ICON_CLUE + " " + esc(t.card(evidence));
     }
 
-    public static Screen accusationWrong(Texts t, Player accuser, Player suspect, Card weapon, Card evidence) {
-        return t.text(accusationLine(t, accuser, suspect, weapon, evidence) + "\n\n"
-                + Theme.ICON_WRONG + " " + t.get("accuse.wrong") + "\n"
-                + t.get("accuse.wrong.used", esc(name(t, accuser))));
+    /**
+     * The group votes on a proposed accusation. A majority of the suspects decides, and the group
+     * has only this one accusation: if it is wrong, the murderer wins.
+     */
+    public static Screen accusationVote(Texts t, GameState game, Accusation accusation) {
+        long chatId = game.getRoom().groupChatId();
+        String text = accusationLine(t, accusation.proposer(), accusation.suspect(),
+                accusation.weapon(), accusation.evidence()) + "\n\n"
+                + bold(t.get("vote.title")) + "\n"
+                + t.get("vote.rule") + "\n\n"
+                + t.get("vote.tally", game.getYesVotes(), game.getNoVotes(), game.getVotesNeeded(),
+                game.getVoters().size());
+        return t.text(text, Keyboard.create()
+                .row(button("✅ " + t.get("btn.vote_yes"), Callbacks.game(Callbacks.VOTE_YES, chatId, accusation.id())),
+                        button("❌ " + t.get("btn.vote_no"), Callbacks.game(Callbacks.VOTE_NO, chatId, accusation.id())))
+                .build());
+    }
+
+    public static Screen accusationRejected(Texts t) {
+        return t.text(Theme.ICON_ACCUSE + " " + bold(t.get("vote.rejected.title")) + "\n"
+                + t.get("vote.rejected.body"));
     }
 
     public static Screen accusationFinal(Texts t, Player accuser, Player suspect, Card weapon, Card evidence,

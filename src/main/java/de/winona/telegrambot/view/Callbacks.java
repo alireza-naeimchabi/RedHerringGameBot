@@ -34,6 +34,8 @@ public final class Callbacks {
     public static final String ACCUSE_WEAPON = "AW";
     public static final String ACCUSE_EVIDENCE = "AE";
     public static final String ACCUSE_CANCEL = "AX";
+    public static final String VOTE_YES = "VY";
+    public static final String VOTE_NO = "VN";
     public static final String NEXT_ROUND = "NR";
     public static final String EVIDENCE_BOARD = "EB";
     public static final String FRAME_PLAYER = "FP";
